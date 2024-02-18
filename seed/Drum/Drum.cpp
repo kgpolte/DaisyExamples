@@ -109,8 +109,8 @@ int main(void)
 
     //Initialize the kick and snare buttons on pins 27 and 28
     //The callback rate is samplerate / blocksize (48)
-    snare.Init(hardware.GetPin(27), samplerate / 48.f);
-    kick.Init(hardware.GetPin(28), samplerate / 48.f);
+    snare.Init(hardware.GetPin(22), samplerate / 48.f);
+    kick.Init(hardware.GetPin(23), samplerate / 48.f);
 
     //Start calling the callback function
     hardware.StartAudio(AudioCallback);

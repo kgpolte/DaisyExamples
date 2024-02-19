@@ -4,14 +4,26 @@
 using namespace daisy;
 using namespace daisysp;
 
+
 DaisySeed      hw;
 AnalogBassDrum bd;
 Switch         sw_1;
 
-#define NUM_ADC_CHANNELS	3
-#define FREQ_PIN 			17
-#define DECAY_PIN 			18
-#define TONE_PIN			19
+// ------------------------------------------------------------------------------
+//
+// ------------------------------------------------------------------------------
+
+#define NUM_ADC_CHANNELS	5
+#define FREQ_PIN 			19
+#define DECAY_PIN 			20
+#define TONE_PIN			21
+#define FREQ_CV_PIN			16
+#define DECAY_CV_PIN		17
+
+#define TRIG_PIN			15
+
+#define MIN_FREQ			30
+#define FREQ_RANGE			50
 
 // ------------------------------------------------------------------------------
 //
@@ -21,15 +33,25 @@ void AudioCallback(AudioHandle::InputBuffer  in,
                    AudioHandle::OutputBuffer out,
                    size_t                    size)
 {
-	sw_1.Debounce();
-
     for(size_t i = 0; i < size; i++)
     {
+		sw_1.Debounce();
 		bool t = sw_1.RisingEdge();
 		
-		if (t) { // If a trigger is received set the controls to the current pot values
-			bd.SetFreq(40 + (hw.adc.GetFloat(0) * 30.f));
-			bd.SetDecay(hw.adc.GetFloat(1));
+		// If a trigger is received read the controls and set the drum's properties
+		if (t) { 
+			float freqToSet = MIN_FREQ + (hw.adc.GetFloat(0) * 30.f) + (hw.adc.GetFloat(3) * FREQ_RANGE);
+			if (freqToSet > MIN_FREQ + FREQ_RANGE) {
+				freqToSet = MIN_FREQ + FREQ_RANGE;
+			}
+
+			float decayToSet = hw.adc.GetFloat(1) + hw.adc.GetFloat(4);
+			if (decayToSet > 1) {
+				decayToSet = 1.f;
+			}
+
+			bd.SetFreq(freqToSet);
+			bd.SetDecay(decayToSet);
 			bd.SetTone(hw.adc.GetFloat(2));
 		}
 
@@ -51,13 +73,11 @@ int main(void)
 
 	// Initialize the AnalogBassDrum object
     bd.Init(sample_rate);
-    bd.SetFreq(50.f);
-	bd.SetTone(.5f);
-    bd.SetDecay(.5f);
-    bd.SetSelfFmAmount(.5f);
+	bd.SetAttackFmAmount(.1f);
+    bd.SetSelfFmAmount(.8f);
 
 	// Initialize the trigger switch
-    sw_1.Init(hw.GetPin(15), sample_rate / 48.f);
+    sw_1.Init(hw.GetPin(TRIG_PIN), sample_rate / 48.f);
 
 	// Create an array to hold all ADC configs
 	AdcChannelConfig adcConfig[NUM_ADC_CHANNELS];
@@ -66,6 +86,8 @@ int main(void)
 	adcConfig[0].InitSingle(hw.GetPin(FREQ_PIN));
 	adcConfig[1].InitSingle(hw.GetPin(DECAY_PIN));
 	adcConfig[2].InitSingle(hw.GetPin(TONE_PIN));
+	adcConfig[3].InitSingle(hw.GetPin(FREQ_CV_PIN));
+	adcConfig[4].InitSingle(hw.GetPin(DECAY_CV_PIN));
 
 	// Initialize the hardware ADC
 	hw.adc.Init(adcConfig, NUM_ADC_CHANNELS);

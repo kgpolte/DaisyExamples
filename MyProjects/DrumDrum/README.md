@@ -27,3 +27,7 @@ this repo once I have verified everything.
 I still need to get the CV input handling correct in the code - I've run into
 some strange issues that I have yet to understand, but all of the other 
 controls are currently working.
+
+Most pressing issue - adding a trigger input in addition to the button.
+Should have this resolved soon. Just need to verify on the breadboard 
+before starting on the code.

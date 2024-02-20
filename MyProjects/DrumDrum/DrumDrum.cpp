@@ -34,6 +34,7 @@ Switch kickTrig, snareTrig;
 //
 // -------------------------------------------------------------
 
+// Remember to update this when adding/removing ranged controls
 int numAdcChannels = 5;
 
 // Kick drum variables
@@ -62,17 +63,25 @@ void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
 
     if(kickTrig.RisingEdge())
     {
-		// Set the kick and pitch envelope attributes and trigger the kick
-		kickVolEnv.SetTime(
-			ADENV_SEG_DECAY,
-			(hw.adc.GetFloat(1) * (kickMaxDecay - kickMinDecay)) + kickMinDecay
-		);
+		// Read ADC inputs
+		float freqPot = hw.adc.GetFloat(0);
+		float fmPot = hw.adc.GetFloat(2);
+		float freqCV = hw.adc.GetFloat(4);
+		float decayCV = (hw.adc.GetFloat(5) * (kickMaxDecay - kickMinDecay)) + kickMinDecay;
+		float decayManual = (hw.adc.GetFloat(1) * (kickMaxDecay - kickMinDecay)) + kickMinDecay;
 
-		float freqMin = kickFreqMin + (hw.adc.GetFloat(0) * (kickFreqMax - kickFreqMin));
+		kickVolEnv.SetTime(ADENV_SEG_DECAY, decayManual);
+
+		//Calculate min and max freqencies for the pitch envelope
+		float freqMin = kickFreqMin + (freqPot * (kickFreqMax - kickFreqMin));
+		float fmAmt = kickMinFm + (fmPot * (kickMaxFm - kickMinFm));
+		float freqMax = freqMin + fmAmt;
+
+		// Set min and max frequency for the pitch envelope
 		kickPitchEnv.SetMin(freqMin);
-		kickPitchEnv.SetMax(
-			freqMin + (kickMinFm + (hw.adc.GetFloat(2) * (kickMaxFm - kickMinFm)))
-		);
+		kickPitchEnv.SetMax(freqMax);
+
+		// Set pitch envelope decay time
 		kickPitchEnv.SetTime(
 			ADENV_SEG_DECAY,
 			kickMinFall + (hw.adc.GetFloat(3) * (kickMaxFall - kickMinFall))

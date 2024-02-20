@@ -6,8 +6,9 @@ KG Polte
 
 ## Description
 
-A kick drum generator based on analog synthesis techniques, using an 
-oscillator with envelopes modulation pitch and amplitude.
+A kick drum generator for the Electrosmith Daisy Seed based on analog
+synthesis techniques, using an oscillator with envelopes modulating 
+pitch and amplitude.
 
 This project used the Drum.cpp from the DaisyExamples repo as a
 starting point with the intention of adding as much control as possible.

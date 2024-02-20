@@ -13,9 +13,16 @@ pitch and amplitude.
 This project used the Drum.cpp from the DaisyExamples repo as a
 starting point with the intention of adding as much control as possible.
 
-I ultimately plan to build this into a Eurorack module.
+This project is still in the very early stages. I ultimately plan to 
+build this into a Eurorack module.
 
 ## Needed changes/additions:
+
+I am working on a schematic for the actual Eurorack module, including
+input/output scaling and overvoltage protection for the Seed's ADCs.
+Everything is working nicely on the breadboard with 4 potentiometers
+and two CV inputs which expect 0-10V. I will add the KiCAD files to
+this repo once I have verified everything.
 
 I still need to get the CV input handling correct in the code - I've run into
 some strange issues that I have yet to understand, but all of the other 

@@ -20,7 +20,7 @@ build this into a Eurorack module.
 
 -I am working on a schematic for the actual Eurorack module, including
 input/output scaling and overvoltage protection for the Seed's ADCs.
-I will add the KiCAD files tothis repo once I have verified everything.
+I will add the KiCAD files to this repo once I have verified everything.
 
 -I'm actively updating the CV inputs on the hardware side, so the code
 here is actively being updated to reflect these changes. Most notably,

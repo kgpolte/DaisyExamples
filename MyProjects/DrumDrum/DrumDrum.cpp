@@ -21,14 +21,15 @@ Switch kickTrig, snareTrig;
 //
 // -------------------------------------------------------------
 
-#define FREQ_PIN 			19
-#define DECAY_PIN 			20
-#define FM_PIN				21
-#define FALL_PIN			22
-#define FREQ_CV_PIN			16
-#define DECAY_CV_PIN		17
-#define KICK_TRIG_PIN		15
-#define SNARE_TRIG_PIN		16
+#define FREQ_PIN 			15  // Seed Pin 22
+#define DECAY_PIN 			16  // Seed Pin 23
+#define FM_PIN				17  // Seed Pin 24
+#define DRIVE_PIN			18  // Seed Pin 23
+#define FREQ_CV_PIN			24  // Seed Pin 31
+#define DECAY_CV_PIN		25  // Seed Pin 32
+#define KICK_TRIG_PIN		8   // Seed Pin 5
+#define SNARE_TRIG_PIN		9   // Seed Pin 4
+#define BTN_PIN             10  // Seed Pin 3
 
 // -------------------------------------------------------------
 //
@@ -173,7 +174,7 @@ int main(void)
 	adcConfig[0].InitSingle(hw.GetPin(FREQ_PIN));
 	adcConfig[1].InitSingle(hw.GetPin(DECAY_PIN));
 	adcConfig[2].InitSingle(hw.GetPin(FM_PIN));
-	adcConfig[3].InitSingle(hw.GetPin(FALL_PIN));
+	adcConfig[3].InitSingle(hw.GetPin(DRIVE_PIN));
 	// CV Inputs
 	adcConfig[4].InitSingle(hw.GetPin(FREQ_CV_PIN));
 	adcConfig[5].InitSingle(hw.GetPin(DECAY_CV_PIN));

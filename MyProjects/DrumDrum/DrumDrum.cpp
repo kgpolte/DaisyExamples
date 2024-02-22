@@ -43,8 +43,6 @@ float kickFreqMin = 40;
 float kickFreqMax = 100;
 float kickMinFm = 50;
 float kickMaxFm = 300;
-float kickMinFall = 0.01;
-float kickMaxFall = 0.09;
 float kickMinDecay = 0.2;
 float kickMaxDecay = 10;
 
@@ -82,12 +80,7 @@ void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
 		kickPitchEnv.SetMin(freqMin);
 		kickPitchEnv.SetMax(freqMax);
 
-		// Set pitch envelope decay time
-		kickPitchEnv.SetTime(
-			ADENV_SEG_DECAY,
-			kickMinFall + (hw.adc.GetFloat(3) * (kickMaxFall - kickMinFall))
-		);
-
+        // Trigger the envelopes
         kickVolEnv.Trigger();
         kickPitchEnv.Trigger();
     }
@@ -155,6 +148,7 @@ int main(void)
     //Note that this envelope is much faster than the volume
     kickPitchEnv.Init(samplerate);
     kickPitchEnv.SetTime(ADENV_SEG_ATTACK, .01);
+    kickPitchEnv.SetTime(ADENV_SEG_DECAY, .05)
 
     //This one will control the kickTrig's volume
     kickVolEnv.Init(samplerate);

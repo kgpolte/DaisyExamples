@@ -20,13 +20,12 @@ build this into a Eurorack module.
 
 -I am working on a schematic for the actual Eurorack module, including
 input/output scaling and overvoltage protection for the Seed's ADCs.
-Everything is working nicely on the breadboard with 4 potentiometers
-and two CV inputs which expect 0-10V. I will add the KiCAD files to
-this repo once I have verified everything.
+I will add the KiCAD files tothis repo once I have verified everything.
 
--I still need to get the CV input handling correct in the code - I've run into
-some strange issues that I have yet to understand, but all of the other 
-controls are currently working.
+-I'm actively updating the CV inputs on the hardware side, so the code
+here is actively being updated to reflect these changes. Most notably,
+I'm making the inputs bipolar (+/- 5V), so the controls will set the
+midpoint of the modulation instead of the base as I had it before.
 
 -Add variable waveshape (Sin/Tri).
 

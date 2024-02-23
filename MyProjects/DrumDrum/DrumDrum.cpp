@@ -69,6 +69,8 @@ void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
 
     if (btn.RisingEdge() || kickTrig.RisingEdge())
     {
+        hw.SetLed(true);
+
 		// Read ADC inputs
 		float freqPot = hw.adc.GetFloat(0);
 		float fmPot = hw.adc.GetFloat(2);
@@ -91,6 +93,10 @@ void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
         // Trigger the envelopes
         kickVolEnv.Trigger();
         kickPitchEnv.Trigger();
+    }
+
+    if (btn.FallingEdge() || kickTrig.FallingEdge()) {
+        hw.SetLed(false);
     }
 
     //Prepare the audio block

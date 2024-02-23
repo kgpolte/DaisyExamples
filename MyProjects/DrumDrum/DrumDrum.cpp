@@ -27,9 +27,9 @@ Switch kickTrig, snareTrig;
 #define DRIVE_PIN			18  // Seed Pin 23
 #define FREQ_CV_PIN			24  // Seed Pin 31
 #define DECAY_CV_PIN		25  // Seed Pin 32
-#define KICK_TRIG_PIN		8   // Seed Pin 5
-#define SNARE_TRIG_PIN		9   // Seed Pin 4
-#define BTN_PIN             10  // Seed Pin 3
+#define KICK_TRIG_PIN		7   // Seed Pin 8
+#define SNARE_TRIG_PIN		8   // Seed Pin 9
+#define BTN_PIN             9  // Seed Pin 10
 
 // -------------------------------------------------------------
 //
@@ -104,7 +104,7 @@ void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
         //Process the next oscillator sample
         osc_low_out = osc_low.Process();
 
-        //Get the next snareTrig sample
+        //Get the next snare sample
         noise_out = noise.Process();
         //Set the sample to the correct volume
         noise_out *= snr_env_out;
@@ -137,7 +137,7 @@ int main(void)
     //Initialize noise
     noise.Init();
 
-    //Initialize envelopes, this one's for the snareTrig amplitude
+    //Initialize envelopes, this one's for the snare amplitude
     snareEnv.Init(samplerate);
     snareEnv.SetTime(ADENV_SEG_ATTACK, .01);
     snareEnv.SetTime(ADENV_SEG_DECAY, .2);
@@ -148,7 +148,7 @@ int main(void)
     //Note that this envelope is much faster than the volume
     kickPitchEnv.Init(samplerate);
     kickPitchEnv.SetTime(ADENV_SEG_ATTACK, .01);
-    kickPitchEnv.SetTime(ADENV_SEG_DECAY, .05)
+    kickPitchEnv.SetTime(ADENV_SEG_DECAY, .05);
 
     //This one will control the kickTrig's volume
     kickVolEnv.Init(samplerate);
@@ -157,7 +157,7 @@ int main(void)
     kickVolEnv.SetMin(0);
 	kickVolEnv.SetCurve(-20.f);
 
-    //Initialize the kickTrig and snareTrig buttons
+    //Initialize the kickTrig and snare buttons
     //The callback rate is samplerate / blocksize (48)
     snareTrig.Init(hw.GetPin(SNARE_TRIG_PIN), samplerate / 48.f);
     kickTrig.Init(hw.GetPin(KICK_TRIG_PIN), samplerate / 48.f);

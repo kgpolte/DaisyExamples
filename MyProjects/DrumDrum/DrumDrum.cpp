@@ -47,8 +47,9 @@ float kickMaxFm = 300;
 float kickMinDecay = 0.2;
 float kickMaxDecay = 10;
 
-bool lastState = false;
-bool risingEdge = false;
+// Trigger inputs are inverted
+// Gate high on the input results in pin reading low (false)
+bool lastKickTrigState = true;
 
 // -------------------------------------------------------------
 //
@@ -65,16 +66,18 @@ void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
 
     // Trigger inputs are inverted
     // Gate high on the input results in pin reading low (false)
-    bool state = kickTrig.Read();
-    if (state == false && lastState == true) {
-        lastState = false;
+    bool kickState = kickTrig.Read();
+    bool kickTriggered = false;
+    if (kickState == false && lastKickTrigState == true) {
+        lastKickTrigState = false;
         hw.SetLed(true);
-    } else if (state == true && lastState == false) {
-        lastState = true;
+        kickTriggered = true;
+    } else if (kickState == true && lastKickTrigState == false) {
+        lastKickTrigState = true;
         hw.SetLed(false);
     }
 
-    if (btn.RisingEdge())
+    if (btn.RisingEdge() || kickTriggered)
     {
 		// Read ADC inputs
 		float freqPot = hw.adc.GetFloat(0);

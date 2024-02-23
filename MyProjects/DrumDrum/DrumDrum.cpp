@@ -16,8 +16,7 @@ WhiteNoise noise;
 
 AdEnv kickVolEnv, kickPitchEnv, snareEnv;
 
-Switch btn;
-GPIO kickTrig, snareTrig;
+Switch btn, kickTrig, snareTrig;
 
 // -------------------------------------------------------------
 //
@@ -30,6 +29,8 @@ GPIO kickTrig, snareTrig;
 #define FREQ_CV_PIN			24              // Seed Pin 31
 #define DECAY_CV_PIN		25              // Seed Pin 32
 
+#define KICK_TRIG_PIN       7               // Seed Pin 8
+#define SNARE_TRIG_PIN       8               // Seed Pin 9
 #define BTN_PIN             9               // Seed Pin 10
 
 // -------------------------------------------------------------
@@ -63,21 +64,10 @@ void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
 
     //Get rid of any bouncing
     btn.Debounce();
+    kickTrig.Debounce();
+    snareTrig.Debounce();
 
-    // Trigger inputs are inverted
-    // Gate high on the input results in pin reading low (false)
-    bool kickState = kickTrig.Read();
-    bool kickTriggered = false;
-    if (kickState == false && lastKickTrigState == true) {
-        lastKickTrigState = false;
-        hw.SetLed(true);
-        kickTriggered = true;
-    } else if (kickState == true && lastKickTrigState == false) {
-        lastKickTrigState = true;
-        hw.SetLed(false);
-    }
-
-    if (btn.RisingEdge() || kickTriggered)
+    if (btn.RisingEdge() || kickTrig.RisingEdge())
     {
 		// Read ADC inputs
 		float freqPot = hw.adc.GetFloat(0);
@@ -172,9 +162,18 @@ int main(void)
     //Initialize the kick and snare triggers
     //The callback rate is samplerate / blocksize (48)
     kickTrig.Init(
-        D7,
-        GPIO::Mode::INPUT,
-        GPIO::Pull::PULLDOWN
+        hw.GetPin(KICK_TRIG_PIN),
+        samplerate / 48.f,
+        Switch::TYPE_MOMENTARY,
+        Switch::POLARITY_INVERTED,
+        Switch::PULL_DOWN
+    );
+    snareTrig.Init(
+        hw.GetPin(SNARE_TRIG_PIN),
+        samplerate / 48.f,
+        Switch::TYPE_MOMENTARY,
+        Switch::POLARITY_INVERTED,
+        Switch::PULL_DOWN
     );
     btn.Init(hw.GetPin(BTN_PIN), samplerate / 48.f);
 

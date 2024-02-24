@@ -13,8 +13,8 @@ pitch and amplitude.
 This project used the Drum.cpp from the DaisyExamples repo as a
 starting point with the intention of adding as much control as possible.
 
-This project is still in the very early stages. I ultimately plan to 
-build this into a Eurorack module.
+This project is still in the very early stages of prototyping. I ultimately
+plan to build this into a Eurorack module.
 
 ## Needed changes/additions:
 

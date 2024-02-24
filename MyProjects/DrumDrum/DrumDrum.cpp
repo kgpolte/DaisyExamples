@@ -13,10 +13,13 @@ DaisySeed hw;
 
 Oscillator osc_low;
 WhiteNoise noise;
+Overdrive od;
 
 AdEnv kickVolEnv, kickPitchEnv, snareEnv;
 
 Switch btn, kickTrig, snareTrig;
+
+// TODO: Add a low-pass filter
 
 // -------------------------------------------------------------
 //
@@ -26,8 +29,6 @@ Switch btn, kickTrig, snareTrig;
 #define DECAY_PIN 			16              // Seed Pin 23
 #define FM_PIN				17              // Seed Pin 24
 #define DRIVE_PIN			18              // Seed Pin 25
-#define FREQ_CV_PIN			24              // Seed Pin 31
-#define DECAY_CV_PIN		25              // Seed Pin 32
 
 #define KICK_TRIG_PIN       7               // Seed Pin 8
 #define SNARE_TRIG_PIN      8               // Seed Pin 9
@@ -47,6 +48,8 @@ float kickMinFm = 50;
 float kickMaxFm = 300;
 float kickMinDecay = 0.2;
 float kickMaxDecay = 10;
+float kickMinDrive = 0.2;
+float kickMaxDrive = 0.8;
 
 // -------------------------------------------------------------
 //
@@ -63,6 +66,7 @@ void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
     kickTrig.Debounce();
     snareTrig.Debounce();
 
+    // Handle kick drum triggers
     if (btn.RisingEdge() || kickTrig.RisingEdge())
     {
         hw.SetLed(true);
@@ -71,6 +75,7 @@ void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
 		float freqCV = hw.adc.GetFloat(0);
         float decayCV = (hw.adc.GetFloat(1) * (kickMaxDecay - kickMinDecay)) + kickMinDecay;
 		float fmCV = hw.adc.GetFloat(2);
+        float driveCV = hw.adc.GetFloat(3);
 
         // Set the volume decay time
 		kickVolEnv.SetTime(ADENV_SEG_DECAY, decayCV);
@@ -87,6 +92,9 @@ void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
         // Trigger the envelopes
         kickVolEnv.Trigger();
         kickPitchEnv.Trigger();
+
+        // Set the overdrive amount
+        od.SetDrive(kickMinDrive + (driveCV * (kickMaxDrive - kickMinDrive)));
     }
 
     if (btn.FallingEdge() || kickTrig.FallingEdge()) {
@@ -100,22 +108,17 @@ void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
         snr_env_out = snareEnv.Process();
         kck_env_out = kickVolEnv.Process();
 
-        //Apply the pitch envelope to the kickTrig
+        // Get the next kick signal
         osc_low.SetFreq(kickPitchEnv.Process());
-        //Set the kickTrig volume to the envelope's output
         osc_low.SetAmp(kck_env_out);
-        //Process the next oscillator sample
         osc_low_out = osc_low.Process();
+        kick_sig = od.Process(osc_low_out);
 
-        // TODO: add an overdrive stage to the kick
-
-        //Get the next snare sample
+        // Get the next snare sample
         noise_out = noise.Process();
-        //Set the sample to the correct volume
         noise_out *= snr_env_out;
 
 		//Set both audio outputs to the kickTrig signal for now
-        kick_sig = osc_low_out;
         out[i] = out[i + 1] = kick_sig;
     }
 }
@@ -132,13 +135,16 @@ int main(void)
     hw.SetAudioBlockSize(4);
     float samplerate = hw.AudioSampleRate();
 
-    //Initialize oscillator for kickdrum
+    // Initialize oscillator for kickdrum
     osc_low.Init(samplerate);
 	osc_low.SetWaveform(Oscillator::WAVE_SIN);
     osc_low.SetAmp(1);
 
-    //Initialize noise
+    // Initialize noise
     noise.Init();
+
+    // Initialize overdrive
+    od.Init();
 
     // Initialize snare envelopes
     snareEnv.Init(samplerate);
@@ -184,9 +190,6 @@ int main(void)
 	adcConfig[1].InitSingle(hw.GetPin(DECAY_PIN));
 	adcConfig[2].InitSingle(hw.GetPin(FM_PIN));
 	adcConfig[3].InitSingle(hw.GetPin(DRIVE_PIN));
-	// CV Inputs
-	adcConfig[4].InitSingle(hw.GetPin(FREQ_CV_PIN));
-	adcConfig[5].InitSingle(hw.GetPin(DECAY_CV_PIN));
 	// Initialize the hw ADC
 	hw.adc.Init(adcConfig, numAdcChannels);
 	hw.adc.Start();

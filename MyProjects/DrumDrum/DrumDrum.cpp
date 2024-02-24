@@ -48,10 +48,6 @@ float kickMaxFm = 300;
 float kickMinDecay = 0.2;
 float kickMaxDecay = 10;
 
-// Trigger inputs are inverted
-// Gate high on the input results in pin reading low (false)
-bool lastKickTrigState = true;
-
 // -------------------------------------------------------------
 //
 // -------------------------------------------------------------
@@ -72,18 +68,16 @@ void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
         hw.SetLed(true);
 
 		// Read ADC inputs
-		float freqPot = hw.adc.GetFloat(0);
-		float fmPot = hw.adc.GetFloat(2);
-		float freqCV = hw.adc.GetFloat(4);
-		float decayCV = (hw.adc.GetFloat(5) * (kickMaxDecay - kickMinDecay)) + kickMinDecay;
-		float decayManual = (hw.adc.GetFloat(1) * (kickMaxDecay - kickMinDecay)) + kickMinDecay;
+		float freqCV = hw.adc.GetFloat(0);
+        float decayCV = (hw.adc.GetFloat(1) * (kickMaxDecay - kickMinDecay)) + kickMinDecay;
+		float fmCV = hw.adc.GetFloat(2);
 
         // Set the volume decay time
-		kickVolEnv.SetTime(ADENV_SEG_DECAY, decayManual);
+		kickVolEnv.SetTime(ADENV_SEG_DECAY, decayCV);
 
 		// Calculate min and max freqencies for the pitch envelope
-		float freqMin = kickFreqMin + (freqPot * (kickFreqMax - kickFreqMin));
-		float fmAmt = kickMinFm + (fmPot * (kickMaxFm - kickMinFm));
+		float freqMin = kickFreqMin + (freqCV * (kickFreqMax - kickFreqMin));
+		float fmAmt = kickMinFm + (fmCV * (kickMaxFm - kickMinFm));
 		float freqMax = freqMin + fmAmt;
 
 		// Set min and max frequency for the pitch envelope
@@ -198,8 +192,8 @@ int main(void)
 	hw.adc.Start();
 
     // Start USB serial logging
-    hw.StartLog(true);
-    hw.PrintLine("DrumDrum Module Ready");
+    // hw.StartLog(true);
+    // hw.PrintLine("DrumDrum Module Ready");
 
     //Start calling the callback function
     hw.StartAudio(AudioCallback);

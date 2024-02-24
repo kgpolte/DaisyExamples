@@ -30,7 +30,7 @@ Switch btn, kickTrig, snareTrig;
 #define DECAY_CV_PIN		25              // Seed Pin 32
 
 #define KICK_TRIG_PIN       7               // Seed Pin 8
-#define SNARE_TRIG_PIN       8               // Seed Pin 9
+#define SNARE_TRIG_PIN      8               // Seed Pin 9
 #define BTN_PIN             9               // Seed Pin 10
 
 // -------------------------------------------------------------

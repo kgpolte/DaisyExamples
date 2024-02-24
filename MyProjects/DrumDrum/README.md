@@ -6,29 +6,24 @@ KG Polte
 
 ## Description
 
-A kick drum generator for the Electrosmith Daisy Seed based on analog
-synthesis techniques, using an oscillator with envelopes modulating 
+A kick and snare drum generator for the Electrosmith Daisy Seed based on
+analog synthesis techniques, using an oscillator with envelopes modulating 
 pitch and amplitude.
 
 This project used the Drum.cpp from the DaisyExamples repo as a
 starting point with the intention of adding as much control as possible.
 
-This project is still in the very early stages. I ultimately plan to 
-build this into a Eurorack module.
+This project is still in the very early stages of prototyping. I ultimately
+plan to build this into a Eurorack module.
 
 ## Needed changes/additions:
 
 -I am working on a schematic for the actual Eurorack module, including
-input/output scaling and overvoltage protection for the Seed's ADCs.
+input/output scaling and overvoltage protection for the Seed's inputs.
 I will add the KiCAD files to this repo once I have verified everything.
 
--I'm actively updating the CV inputs on the hardware side, so the code
-here is actively being updated to reflect these changes. Most notably,
-I'm making the inputs bipolar (+/- 5V), so the controls will set the
-midpoint of the modulation instead of the base as I had it before.
+-Add snare functionality. I have not set up the trigger on the breadboard
+yet to test, but that is coming soon. I will also add another oscillator
+to mix into the snare signal.
 
--Add variable waveshape (Sin/Tri).
-
--Most pressing issue - adding a trigger input in addition to the button.
-Should have this resolved soon. Just need to verify on the breadboard 
-before starting on the code.
+-Add an overdrive stage to the kick drum.

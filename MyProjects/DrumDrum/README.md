@@ -6,7 +6,7 @@ KG Polte
 
 ## Description
 
-A kick and snare drum generator for the Electrosmith Daisy Seed based on
+A kick drum generator for the Electrosmith Daisy Seed based on
 analog synthesis techniques, using an oscillator with envelopes modulating 
 pitch and amplitude.
 
@@ -22,8 +22,6 @@ plan to build this into a Eurorack module.
 input/output scaling and overvoltage protection for the Seed's inputs.
 I will add the KiCAD files to this repo once I have verified everything.
 
--Add snare functionality. I have not set up the trigger on the breadboard
-yet to test, but that is coming soon. I will also add another oscillator
-to mix into the snare signal.
+-Try different curves for the pitch envelope
 
--Add an overdrive stage to the kick drum.
+-Add setter methods to change min/max control values

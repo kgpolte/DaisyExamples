@@ -5,51 +5,138 @@ using namespace daisy;
 using namespace daisy::seed;
 using namespace daisysp;
 
-// -------------------------------------------------------------
-//
-// -------------------------------------------------------------
-
 DaisySeed hw;
 
-Oscillator osc_low;
-WhiteNoise noise;
-Overdrive od;
+// -------------------------------------------------------------
+//
+// -------------------------------------------------------------
 
-AdEnv kickVolEnv, kickPitchEnv, snareEnv;
+class BassDrum {
+private:
+    Pin m_freqPin, m_decayPin, m_fmPin, m_drivePin;
+    Switch m_trigger, m_btn;
+    Oscillator m_osc;
+    AdEnv m_ampEnv, m_pitchEnv;
+    Overdrive m_od;
 
-Switch btn, kickTrig, snareTrig;
+    int m_freqAdc, m_decayAdc, m_fmAdc, m_driveAdc;
+    float m_FreqMin, m_FreqMax, m_FmMin, m_FmMax, m_DecayMin, m_DecayMax, m_DriveMin, m_DriveMax;
 
-// TODO: Add a low-pass filter
+    void HandleTrigger() {
+        hw.SetLed(true);
+
+        // Read ADC inputs
+        float freqCV = hw.adc.GetFloat(m_freqAdc);
+        float decayCV = (hw.adc.GetFloat(m_decayAdc) * (m_DecayMax - m_DecayMin)) + m_DecayMin;
+        float fmCV = hw.adc.GetFloat(m_fmAdc);
+        float driveCV = hw.adc.GetFloat(m_driveAdc);
+
+        // Set the volume decay time
+        m_ampEnv.SetTime(ADENV_SEG_DECAY, decayCV);
+
+        // Calculate min and max freqencies for the pitch envelope
+        float freqMin = m_FreqMin + (freqCV * (m_FreqMax - m_FreqMin));
+        float fmAmt = m_FmMin + (fmCV * (m_FmMax - m_FmMin));
+        float freqMax = freqMin + fmAmt;
+
+        // Set min and max frequency for the pitch envelope
+        m_pitchEnv.SetMin(freqMin);
+        m_pitchEnv.SetMax(freqMax);
+
+        // Trigger the envelopes
+        m_ampEnv.Trigger();
+        m_pitchEnv.Trigger();
+
+        // Set the overdrive amount
+        m_od.SetDrive(m_DriveMin + (driveCV * (m_DriveMax - m_DriveMin)));
+    }
+
+public:
+
+    // TODO: Add setter methods for min/max values
+
+    void Init(
+        float samplerate,
+        Pin triggerPin = D7,
+        Pin btnPin = D9,
+        int freqAdc = 0,
+        int decayAdc = 1,
+        int fmAdc = 2,
+        int driveAdc = 3
+    ) {
+        // Set Adc indexes
+        m_freqAdc = freqAdc;
+        m_decayAdc = decayAdc;
+        m_fmAdc = fmAdc;
+        m_driveAdc = driveAdc;
+
+        // Set minimum/maximum control values
+        m_FreqMin = 40;
+        m_FreqMax = 100;
+        m_DecayMin = 0.2;
+        m_DecayMax = 10;
+        m_FmMin = 50;
+        m_FmMax = 250;
+        m_DriveMin = 0.2;
+        m_DriveMax = 0.8;
+
+        // Initialize trigger and button inputs
+        m_btn.Init(btnPin, samplerate / 48.f);
+        m_trigger.Init(
+            triggerPin,
+            samplerate / 48.f,
+            Switch::TYPE_MOMENTARY,
+            Switch::POLARITY_INVERTED,
+            Switch::PULL_DOWN
+        );
+
+        // Initialize oscillator
+        m_osc.Init(samplerate);
+        m_osc.SetAmp(1);
+
+        // Initizialize amplitdue envelope
+        m_ampEnv.Init(samplerate);
+        m_ampEnv.SetTime(ADENV_SEG_ATTACK, .01);
+        m_ampEnv.SetMax(1);
+        m_ampEnv.SetMin(0);
+        m_ampEnv.SetCurve(-20.f);
+
+        // Initizialize pitch envelope
+        // TODO: Try different curves
+        m_pitchEnv.Init(samplerate);
+        m_pitchEnv.SetTime(ADENV_SEG_ATTACK, .01);
+        m_pitchEnv.SetTime(ADENV_SEG_DECAY, .05);
+
+        // Initialize overdrive
+        m_od.Init();
+    }
+
+    void Update() {
+        m_btn.Debounce();
+        m_trigger.Debounce();
+
+        if (m_btn.RisingEdge() || m_trigger.RisingEdge())
+        {
+            HandleTrigger();
+        } else if (m_btn.FallingEdge() || m_trigger.FallingEdge()) {
+            hw.SetLed(false);
+        }
+    }
+
+    float Process() {
+        m_osc.SetFreq(m_pitchEnv.Process());
+        m_osc.SetAmp(m_ampEnv.Process());
+        float oscOut = m_osc.Process();
+        float sig = m_od.Process(oscOut);
+        return sig;
+    }
+};
 
 // -------------------------------------------------------------
 //
 // -------------------------------------------------------------
 
-#define FREQ_PIN 			15              // Seed Pin 22
-#define DECAY_PIN 			16              // Seed Pin 23
-#define FM_PIN				17              // Seed Pin 24
-#define DRIVE_PIN			18              // Seed Pin 25
-
-#define KICK_TRIG_PIN       7               // Seed Pin 8
-#define SNARE_TRIG_PIN      8               // Seed Pin 9
-#define BTN_PIN             9               // Seed Pin 10
-
-// -------------------------------------------------------------
-//
-// -------------------------------------------------------------
-
-// Remember to update this when adding/removing analog controls
-int numAdcChannels = 5;
-
-// Kick drum variables
-float kickFreqMin = 40;
-float kickFreqMax = 100;
-float kickMinFm = 50;
-float kickMaxFm = 300;
-float kickMinDecay = 0.2;
-float kickMaxDecay = 10;
-float kickMinDrive = 0.2;
-float kickMaxDrive = 0.8;
+BassDrum drum;
 
 // -------------------------------------------------------------
 //
@@ -59,67 +146,14 @@ void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
                    AudioHandle::InterleavingOutputBuffer out,
                    size_t                                size)
 {
-    float osc_low_out, noise_out, snr_env_out, kck_env_out, kick_sig;
+    float sig;
 
-    //Get rid of any bouncing
-    btn.Debounce();
-    kickTrig.Debounce();
-    snareTrig.Debounce();
+    drum.Update();
 
-    // Handle kick drum triggers
-    if (btn.RisingEdge() || kickTrig.RisingEdge())
-    {
-        hw.SetLed(true);
-
-		// Read ADC inputs
-		float freqCV = hw.adc.GetFloat(0);
-        float decayCV = (hw.adc.GetFloat(1) * (kickMaxDecay - kickMinDecay)) + kickMinDecay;
-		float fmCV = hw.adc.GetFloat(2);
-        float driveCV = hw.adc.GetFloat(3);
-
-        // Set the volume decay time
-		kickVolEnv.SetTime(ADENV_SEG_DECAY, decayCV);
-
-		// Calculate min and max freqencies for the pitch envelope
-		float freqMin = kickFreqMin + (freqCV * (kickFreqMax - kickFreqMin));
-		float fmAmt = kickMinFm + (fmCV * (kickMaxFm - kickMinFm));
-		float freqMax = freqMin + fmAmt;
-
-		// Set min and max frequency for the pitch envelope
-		kickPitchEnv.SetMin(freqMin);
-		kickPitchEnv.SetMax(freqMax);
-
-        // Trigger the envelopes
-        kickVolEnv.Trigger();
-        kickPitchEnv.Trigger();
-
-        // Set the overdrive amount
-        od.SetDrive(kickMinDrive + (driveCV * (kickMaxDrive - kickMinDrive)));
-    }
-
-    if (btn.FallingEdge() || kickTrig.FallingEdge()) {
-        hw.SetLed(false);
-    }
-
-    //Prepare the audio block
     for(size_t i = 0; i < size; i += 2)
     {
-        //Get the next volume samples
-        snr_env_out = snareEnv.Process();
-        kck_env_out = kickVolEnv.Process();
-
-        // Get the next kick signal
-        osc_low.SetFreq(kickPitchEnv.Process());
-        osc_low.SetAmp(kck_env_out);
-        osc_low_out = osc_low.Process();
-        kick_sig = od.Process(osc_low_out);
-
-        // Get the next snare sample
-        noise_out = noise.Process();
-        noise_out *= snr_env_out;
-
-		//Set both audio outputs to the kickTrig signal for now
-        out[i] = out[i + 1] = kick_sig;
+        sig = drum.Process();
+        out[i] = out[i + 1] = sig;
     }
 }
 
@@ -135,72 +169,23 @@ int main(void)
     hw.SetAudioBlockSize(4);
     float samplerate = hw.AudioSampleRate();
 
-    // Initialize oscillator for kickdrum
-    osc_low.Init(samplerate);
-	osc_low.SetWaveform(Oscillator::WAVE_SIN);
-    osc_low.SetAmp(1);
+    drum.Init(samplerate);
 
-    // Initialize noise
-    noise.Init();
+    // Configure ADCs
+    AdcChannelConfig adcConfig[4];
+    adcConfig[0].InitSingle(A0);      // Freqency
+    adcConfig[1].InitSingle(A1);      // Decay
+    adcConfig[2].InitSingle(A2);      // FM
+    adcConfig[3].InitSingle(A3);      // Drive
+    hw.adc.Init(adcConfig, 4);
+    hw.adc.Start();
 
-    // Initialize overdrive
-    od.Init();
-
-    // Initialize snare envelopes
-    snareEnv.Init(samplerate);
-    snareEnv.SetTime(ADENV_SEG_ATTACK, .01);
-    snareEnv.SetTime(ADENV_SEG_DECAY, .2);
-    snareEnv.SetMax(1);
-    snareEnv.SetMin(0);
-
-    // Initialize kick pitch envelope
-    kickPitchEnv.Init(samplerate);
-    kickPitchEnv.SetTime(ADENV_SEG_ATTACK, .01);
-    kickPitchEnv.SetTime(ADENV_SEG_DECAY, .05);
-
-    // Initialize kick volume envelope
-    kickVolEnv.Init(samplerate);
-    kickVolEnv.SetTime(ADENV_SEG_ATTACK, .01);
-    kickVolEnv.SetMax(1);
-    kickVolEnv.SetMin(0);
-	kickVolEnv.SetCurve(-20.f);
-
-    //Initialize the kick and snare triggers
-    //The callback rate is samplerate / blocksize (48)
-    kickTrig.Init(
-        hw.GetPin(KICK_TRIG_PIN),
-        samplerate / 48.f,
-        Switch::TYPE_MOMENTARY,
-        Switch::POLARITY_INVERTED,
-        Switch::PULL_DOWN
-    );
-    snareTrig.Init(
-        hw.GetPin(SNARE_TRIG_PIN),
-        samplerate / 48.f,
-        Switch::TYPE_MOMENTARY,
-        Switch::POLARITY_INVERTED,
-        Switch::PULL_DOWN
-    );
-    btn.Init(hw.GetPin(BTN_PIN), samplerate / 48.f);
-
-	// Initialize ADCs
-	AdcChannelConfig adcConfig[numAdcChannels];
-	// Potentiometers
-	adcConfig[0].InitSingle(hw.GetPin(FREQ_PIN));
-	adcConfig[1].InitSingle(hw.GetPin(DECAY_PIN));
-	adcConfig[2].InitSingle(hw.GetPin(FM_PIN));
-	adcConfig[3].InitSingle(hw.GetPin(DRIVE_PIN));
-	// Initialize the hw ADC
-	hw.adc.Init(adcConfig, numAdcChannels);
-	hw.adc.Start();
-
-    // Start USB serial logging
-    // hw.StartLog(true);
-    // hw.PrintLine("DrumDrum Module Ready");
+    // Start serial logging
+    hw.StartLog(true);
+    hw.PrintLine("Daisy Ready");
 
     //Start calling the callback function
     hw.StartAudio(AudioCallback);
 
-    // Loop forever
     for(;;) {}
 }

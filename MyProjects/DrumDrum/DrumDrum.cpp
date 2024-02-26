@@ -18,21 +18,23 @@ private:
     Oscillator m_osc;
     AdEnv m_ampEnv, m_pitchEnv;
     Overdrive m_od;
+    Svf m_svf;
 
     int m_freqAdc, m_decayAdc, m_fmAdc, m_driveAdc;
-    float m_FreqMin, m_FreqMax, m_FmMin, m_FmMax, m_DecayMin, m_DecayMax, m_DriveMin, m_DriveMax;
+    float m_FreqMin, m_FreqMax, m_FmMin, m_FmMax, m_DecayMin, m_DecayMax, m_DriveMin, m_DriveMax, m_cutoffMin, m_cutoffMax;
 
     void HandleTrigger() {
         hw.SetLed(true);
 
         // Read ADC inputs
         float freqCV = hw.adc.GetFloat(m_freqAdc);
-        float decayCV = (hw.adc.GetFloat(m_decayAdc) * (m_DecayMax - m_DecayMin)) + m_DecayMin;
+        float decayCV = hw.adc.GetFloat(m_decayAdc);
         float fmCV = hw.adc.GetFloat(m_fmAdc);
         float driveCV = hw.adc.GetFloat(m_driveAdc);
 
         // Set the volume decay time
-        m_ampEnv.SetTime(ADENV_SEG_DECAY, decayCV);
+        float decayTime = (decayCV * (m_DecayMax - m_DecayMin)) + m_DecayMin;
+        m_ampEnv.SetTime(ADENV_SEG_DECAY, decayTime);
 
         // Calculate min and max freqencies for the pitch envelope
         float freqMin = m_FreqMin + (freqCV * (m_FreqMax - m_FreqMin));
@@ -71,14 +73,16 @@ public:
         m_driveAdc = driveAdc;
 
         // Set minimum/maximum control values
-        m_FreqMin = 40;
-        m_FreqMax = 100;
-        m_DecayMin = 0.2;
-        m_DecayMax = 10;
-        m_FmMin = 50;
-        m_FmMax = 250;
-        m_DriveMin = 0.2;
-        m_DriveMax = 0.8;
+        m_FreqMin = 40.f;
+        m_FreqMax = 100.f;
+        m_DecayMin = 0.2f;
+        m_DecayMax = 10.f;
+        m_FmMin = 50.f;
+        m_FmMax = 250.f;
+        m_DriveMin = 0.25f;
+        m_DriveMax = 0.6f;
+        m_cutoffMin = 40.f;
+        m_cutoffMax = 4000.f;
 
         // Initialize trigger and button inputs
         m_btn.Init(btnPin, samplerate / 48.f);
@@ -107,8 +111,9 @@ public:
         m_pitchEnv.SetTime(ADENV_SEG_ATTACK, .01);
         m_pitchEnv.SetTime(ADENV_SEG_DECAY, .05);
 
-        // Initialize overdrive
+        // Initialize overdrive and filter
         m_od.Init();
+        m_svf.Init(samplerate);
     }
 
     void Update() {
@@ -127,7 +132,16 @@ public:
         m_osc.SetFreq(m_pitchEnv.Process());
         m_osc.SetAmp(m_ampEnv.Process());
         float oscOut = m_osc.Process();
-        float sig = m_od.Process(oscOut);
+        float odOut = m_od.Process(oscOut);
+
+        float mix = (odOut / 2 + oscOut / 2);
+
+        m_svf.SetFreq(300.f);
+        m_svf.SetDrive(1.f);
+        m_svf.SetRes(0.5f);
+        m_svf.Process(mix);
+        float sig = m_svf.Low();
+
         return sig;
     }
 };

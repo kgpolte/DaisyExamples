@@ -7,30 +7,52 @@ using namespace daisysp;
 
 DaisySeed hw;
 
+// Hardware definitions
+constexpr Pin PIN_TRIG      = D7;
+constexpr Pin PIN_BTN       = D9;
+constexpr Pin PIN_FREQ      = A0;
+constexpr Pin PIN_DECAY     = A1;
+constexpr Pin PIN_FM        = A2;
+constexpr Pin PIN_DRIVE     = A3;
+constexpr Pin PIN_TONE      = A4;
+
+// ADC indeces
+int FREQ_INDEX          = 0;
+int DECAY_INDEX         = 1;
+int FM_INDEX            = 2;
+int DRIVE_INDEX         = 3;
+int TONE_INDEX          = 4;
+
 // -------------------------------------------------------------
 //
 // -------------------------------------------------------------
 
 class BassDrum {
 private:
+    // hardware objects
     Pin m_freqPin, m_decayPin, m_fmPin, m_drivePin;
     Switch m_trigger, m_btn;
+    AnalogControl m_freqCtrl, m_decayCtrl, m_fmCtrl, m_driveCtrl, m_toneCtrl;
+
+    // Audio objects
     Oscillator m_osc;
     AdEnv m_ampEnv, m_pitchEnv;
     Overdrive m_od;
     Svf m_svf;
 
-    int m_freqAdc, m_decayAdc, m_fmAdc, m_driveAdc;
+    // Variables
     float m_FreqMin, m_FreqMax, m_FmMin, m_FmMax, m_DecayMin, m_DecayMax, m_DriveMin, m_DriveMax, m_cutoffMin, m_cutoffMax;
 
-    void HandleTrigger() {
+    // Functions
+    void m_HandleTrigger() {
         hw.SetLed(true);
 
-        // Read ADC inputs
-        float freqCV = hw.adc.GetFloat(m_freqAdc);
-        float decayCV = hw.adc.GetFloat(m_decayAdc);
-        float fmCV = hw.adc.GetFloat(m_fmAdc);
-        float driveCV = hw.adc.GetFloat(m_driveAdc);
+        // Read AnalogControl values
+        float freqCV = m_freqCtrl.Value();
+        float decayCV = m_decayCtrl.Value();
+        float fmCV = m_fmCtrl.Value();
+        float driveCV = m_driveCtrl.Value();
+        float toneCV = m_toneCtrl.Value();
 
         // Set the volume decay time
         float decayTime = (decayCV * (m_DecayMax - m_DecayMin)) + m_DecayMin;
@@ -64,13 +86,15 @@ public:
         int freqAdc = 0,
         int decayAdc = 1,
         int fmAdc = 2,
-        int driveAdc = 3
+        int driveAdc = 3,
+        int toneAdc = 4
     ) {
-        // Set Adc indexes
-        m_freqAdc = freqAdc;
-        m_decayAdc = decayAdc;
-        m_fmAdc = fmAdc;
-        m_driveAdc = driveAdc;
+        // Initialize AnalogControls
+        m_freqCtrl.Init(hw.adc.GetPtr(FREQ_INDEX), samplerate);
+        m_decayCtrl.Init(hw.adc.GetPtr(DECAY_INDEX), samplerate);
+        m_fmCtrl.Init(hw.adc.GetPtr(FM_INDEX), samplerate);
+        m_driveCtrl.Init(hw.adc.GetPtr(DRIVE_INDEX), samplerate);
+        m_toneCtrl.Init(hw.adc.GetPtr(TONE_INDEX), samplerate);
 
         // Set minimum/maximum control values
         m_FreqMin = 40.f;
@@ -117,12 +141,21 @@ public:
     }
 
     void Update() {
+        // Debounce Switches
         m_btn.Debounce();
         m_trigger.Debounce();
 
+        // Update AnalogControls
+        m_freqCtrl.Process();
+        m_decayCtrl.Process();
+        m_fmCtrl.Process();
+        m_driveCtrl.Process();
+        m_toneCtrl.Process();
+
+        // Check for rising/falling edges on digital inputs
         if (m_btn.RisingEdge() || m_trigger.RisingEdge())
         {
-            HandleTrigger();
+            m_HandleTrigger();
         } else if (m_btn.FallingEdge() || m_trigger.FallingEdge()) {
             hw.SetLed(false);
         }
@@ -160,10 +193,9 @@ void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
                    AudioHandle::InterleavingOutputBuffer out,
                    size_t                                size)
 {
-    float sig;
-
     drum.Update();
 
+    float sig;
     for(size_t i = 0; i < size; i += 2)
     {
         sig = drum.Process();
@@ -183,19 +215,27 @@ int main(void)
     hw.SetAudioBlockSize(4);
     float samplerate = hw.AudioSampleRate();
 
-    drum.Init(samplerate);
-
-    // TODO: Change direct manipulation of adc to
-    // AnalogControl objects
-
-    // Configure ADCs
-    AdcChannelConfig adcConfig[4];
-    adcConfig[0].InitSingle(A0);      // Freqency
-    adcConfig[1].InitSingle(A1);      // Decay
-    adcConfig[2].InitSingle(A2);      // FM
-    adcConfig[3].InitSingle(A3);      // Drive
-    hw.adc.Init(adcConfig, 4);
+    // Configure and initialize ADCs
+    AdcChannelConfig adcConfig[5];
+    adcConfig[FREQ_INDEX].InitSingle(PIN_FREQ);
+    adcConfig[DECAY_INDEX].InitSingle(PIN_DECAY);
+    adcConfig[FM_INDEX].InitSingle(PIN_FM);
+    adcConfig[DRIVE_INDEX].InitSingle(PIN_DRIVE);
+    adcConfig[TONE_INDEX].InitSingle(PIN_TONE);
+    hw.adc.Init(adcConfig, 5);
     hw.adc.Start();
+
+    // Initialize BassDrum
+    drum.Init(
+        samplerate,
+        PIN_TRIG,
+        PIN_BTN,
+        FREQ_INDEX,
+        DECAY_INDEX,
+        FM_INDEX,
+        DRIVE_INDEX,
+        TONE_INDEX
+    );
 
     // Start serial logging
     // hw.StartLog(true);

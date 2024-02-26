@@ -18,10 +18,12 @@ plan to build this into a Eurorack module.
 
 ## Needed changes/additions:
 
--I am working on a schematic for the actual Eurorack module, including
-input/output scaling and overvoltage protection for the Seed's inputs.
-I will add the KiCAD files to this repo once I have verified everything.
+-Use AnalogControl objects to handle CV/pot inputs
 
 -Try different curves for the pitch envelope
 
 -Add setter methods to change min/max control values
+
+-I am working on a schematic for the actual Eurorack module, including
+input/output scaling and overvoltage protection for the Seed's inputs.
+I will add the KiCAD files to this repo once I have verified everything.

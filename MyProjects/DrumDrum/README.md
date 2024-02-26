@@ -18,7 +18,11 @@ plan to build this into a Eurorack module.
 
 ## Needed changes/additions:
 
--Use AnalogControl objects to handle CV/pot inputs
+-CONTROL OVER TONE CUTOFF
+
+-Come up with a better implementation for the drive control
+
+-Add a second channel?
 
 -Try different curves for the pitch envelope
 

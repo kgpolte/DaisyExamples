@@ -17,11 +17,11 @@ constexpr Pin PIN_DRIVE     = A3;
 constexpr Pin PIN_TONE      = A4;
 
 // ADC indeces
-int FREQ_INDEX          = 0;
-int DECAY_INDEX         = 1;
-int FM_INDEX            = 2;
-int DRIVE_INDEX         = 3;
-int TONE_INDEX          = 4;
+int FREQ_INDEX      = 0;
+int DECAY_INDEX     = 1;
+int FM_INDEX        = 2;
+int DRIVE_INDEX     = 3;
+int TONE_INDEX      = 4;
 
 // -------------------------------------------------------------
 //

@@ -185,6 +185,9 @@ int main(void)
 
     drum.Init(samplerate);
 
+    // TODO: Change direct manipulation of adc to
+    // AnalogControl objects
+
     // Configure ADCs
     AdcChannelConfig adcConfig[4];
     adcConfig[0].InitSingle(A0);      // Freqency
@@ -195,8 +198,8 @@ int main(void)
     hw.adc.Start();
 
     // Start serial logging
-    hw.StartLog(true);
-    hw.PrintLine("Daisy Ready");
+    // hw.StartLog(true);
+    // hw.PrintLine("Daisy ready...");
 
     //Start calling the callback function
     hw.StartAudio(AudioCallback);

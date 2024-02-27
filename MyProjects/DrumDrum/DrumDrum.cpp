@@ -73,6 +73,9 @@ private:
 
         // Set the overdrive amount
         m_od.SetDrive(m_DriveMin + (driveCV * (m_DriveMax - m_DriveMin)));
+
+        // Set the LPF cutoff freqency
+        m_svf.SetFreq(m_cutoffMin + (toneCV * (m_cutoffMax - m_cutoffMin)));
     }
 
 public:
@@ -106,7 +109,7 @@ public:
         m_DriveMin = 0.25f;
         m_DriveMax = 0.6f;
         m_cutoffMin = 40.f;
-        m_cutoffMax = 4000.f;
+        m_cutoffMax = 500.f;
 
         // Initialize trigger and button inputs
         m_btn.Init(btnPin, samplerate / 48.f);
@@ -137,7 +140,11 @@ public:
 
         // Initialize overdrive and filter
         m_od.Init();
+
+        // Initialize low pass filter
         m_svf.Init(samplerate);
+        m_svf.SetDrive(1.f);
+        m_svf.SetRes(0.25f);
     }
 
     void Update() {
@@ -164,14 +171,11 @@ public:
     float Process() {
         m_osc.SetFreq(m_pitchEnv.Process());
         m_osc.SetAmp(m_ampEnv.Process());
+
         float oscOut = m_osc.Process();
         float odOut = m_od.Process(oscOut);
-
         float mix = (odOut / 2 + oscOut / 2);
-
-        m_svf.SetFreq(300.f);
-        m_svf.SetDrive(1.f);
-        m_svf.SetRes(0.5f);
+        
         m_svf.Process(mix);
         float sig = m_svf.Low();
 

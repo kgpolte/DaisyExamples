@@ -18,7 +18,7 @@ plan to build this into a Eurorack module.
 
 ## Needed changes/additions:
 
--CONTROL OVER TONE CUTOFF
+-Add a resonance control
 
 -Come up with a better implementation for the drive control
 

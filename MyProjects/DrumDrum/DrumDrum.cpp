@@ -6,22 +6,28 @@ using namespace daisy::seed;
 using namespace daisysp;
 
 DaisySeed hw;
+Led led1, led2;
 
-// Hardware definitions
-constexpr Pin PIN_TRIG      = D7;
-constexpr Pin PIN_BTN       = D9;
+// Hardware pin definitions
+constexpr Pin PIN_TRIG      = D13;
+constexpr Pin PIN_BTN1      = D2;
+constexpr Pin PIN_BTN2      = D3;
+constexpr Pin PIN_LED1      = D26;
+constexpr Pin PIN_LED2      = D27;
 constexpr Pin PIN_FREQ      = A0;
 constexpr Pin PIN_DECAY     = A1;
-constexpr Pin PIN_FM        = A2;
-constexpr Pin PIN_DRIVE     = A3;
-constexpr Pin PIN_TONE      = A4;
+constexpr Pin PIN_VELOCITY  = A2;
+constexpr Pin PIN_FM        = A3;
+constexpr Pin PIN_DRIVE     = A4;
+constexpr Pin PIN_TONE      = A5;
 
 // ADC indeces
 int FREQ_INDEX      = 0;
 int DECAY_INDEX     = 1;
-int FM_INDEX        = 2;
-int DRIVE_INDEX     = 3;
-int TONE_INDEX      = 4;
+int VELOCITY_INDEX  = 2;
+int FM_INDEX        = 3;
+int DRIVE_INDEX     = 4;
+int TONE_INDEX      = 5;
 
 // -------------------------------------------------------------
 //
@@ -30,9 +36,8 @@ int TONE_INDEX      = 4;
 class BassDrum {
 private:
     // hardware objects
-    Pin m_freqPin, m_decayPin, m_fmPin, m_drivePin;
     Switch m_trigger, m_btn;
-    AnalogControl m_freqCtrl, m_decayCtrl, m_fmCtrl, m_driveCtrl, m_toneCtrl;
+    AnalogControl m_freqCtrl, m_decayCtrl, m_velocityCtrl, m_driveCtrl, m_fmCtrl, m_toneCtrl;
 
     // Audio objects
     Oscillator m_osc;
@@ -50,6 +55,7 @@ private:
         // Read AnalogControl values
         float freqCV = m_freqCtrl.Value();
         float decayCV = m_decayCtrl.Value();
+        float velocityCV = m_velocityCtrl.Value();
         float fmCV = m_fmCtrl.Value();
         float driveCV = m_driveCtrl.Value();
         float toneCV = m_toneCtrl.Value();
@@ -84,20 +90,22 @@ public:
 
     void Init(
         float samplerate,
-        Pin triggerPin = D7,
-        Pin btnPin = D9,
-        int freqAdc = 0,
-        int decayAdc = 1,
-        int fmAdc = 2,
-        int driveAdc = 3,
-        int toneAdc = 4
+        Pin triggerPin,
+        Pin btnPin,
+        int freqAdcIndex,
+        int decayAdcIndex,
+        int velocityAdcIndex,
+        int fmAdcIndex,
+        int driveAdcIndex,
+        int toneAdcIndex
     ) {
         // Initialize AnalogControls
-        m_freqCtrl.Init(hw.adc.GetPtr(FREQ_INDEX), samplerate);
-        m_decayCtrl.Init(hw.adc.GetPtr(DECAY_INDEX), samplerate);
-        m_fmCtrl.Init(hw.adc.GetPtr(FM_INDEX), samplerate);
-        m_driveCtrl.Init(hw.adc.GetPtr(DRIVE_INDEX), samplerate);
-        m_toneCtrl.Init(hw.adc.GetPtr(TONE_INDEX), samplerate);
+        m_freqCtrl.Init(hw.adc.GetPtr(freqAdcIndex), samplerate, true);
+        m_decayCtrl.Init(hw.adc.GetPtr(decayAdcIndex), samplerate, true);
+        m_velocityCtrl.Init(hw.adc.GetPtr(velocityAdcIndex), samplerate, true);
+        m_driveCtrl.Init(hw.adc.GetPtr(driveAdcIndex), samplerate, true);
+        m_fmCtrl.Init(hw.adc.GetPtr(fmAdcIndex), samplerate);
+        m_toneCtrl.Init(hw.adc.GetPtr(toneAdcIndex), samplerate);
 
         // Set minimum/maximum control values
         m_FreqMin = 40.f;
@@ -106,10 +114,10 @@ public:
         m_DecayMax = 10.f;
         m_FmMin = 50.f;
         m_FmMax = 250.f;
-        m_DriveMin = 0.25f;
-        m_DriveMax = 0.6f;
+        m_DriveMin = 0.2f;
+        m_DriveMax = 0.5f;
         m_cutoffMin = 40.f;
-        m_cutoffMax = 500.f;
+        m_cutoffMax = 400.f;
 
         // Initialize trigger and button inputs
         m_btn.Init(btnPin, samplerate / 48.f);
@@ -123,6 +131,7 @@ public:
 
         // Initialize oscillator
         m_osc.Init(samplerate);
+        // m_osc.SetWaveform(Oscillator::WAVE_POLYBLEP_TRI);
         m_osc.SetAmp(1);
 
         // Initizialize amplitdue envelope
@@ -143,8 +152,8 @@ public:
 
         // Initialize low pass filter
         m_svf.Init(samplerate);
-        m_svf.SetDrive(1.f);
-        m_svf.SetRes(0.25f);
+        m_svf.SetDrive(0.1f);
+        m_svf.SetRes(0.1f);
     }
 
     void Update() {
@@ -155,6 +164,7 @@ public:
         // Update AnalogControls
         m_freqCtrl.Process();
         m_decayCtrl.Process();
+        m_velocityCtrl.Process();
         m_fmCtrl.Process();
         m_driveCtrl.Process();
         m_toneCtrl.Process();
@@ -173,10 +183,11 @@ public:
         m_osc.SetAmp(m_ampEnv.Process());
 
         float oscOut = m_osc.Process();
-        float odOut = m_od.Process(oscOut);
-        float mix = (odOut / 2 + oscOut / 2);
+
+        // TODO: Find a better way to mix in overdrive
+        float odOut = m_od.Process(oscOut / 2);
         
-        m_svf.Process(mix);
+        m_svf.Process(odOut);
         float sig = m_svf.Low();
 
         return sig;
@@ -202,6 +213,8 @@ void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
     float sig;
     for(size_t i = 0; i < size; i += 2)
     {
+        led1.Update();
+        led2.Update();
         sig = drum.Process();
         out[i] = out[i + 1] = sig;
     }
@@ -219,23 +232,31 @@ int main(void)
     hw.SetAudioBlockSize(4);
     float samplerate = hw.AudioSampleRate();
 
+    // Initialize indicator Leds
+    led1.Init(PIN_LED1, false, samplerate);
+    led1.Set(1.f);
+    led2.Init(PIN_LED2, false, samplerate);
+    led2.Set(1.f);
+
     // Configure and initialize ADCs
     AdcChannelConfig adcConfig[5];
     adcConfig[FREQ_INDEX].InitSingle(PIN_FREQ);
     adcConfig[DECAY_INDEX].InitSingle(PIN_DECAY);
+    adcConfig[VELOCITY_INDEX].InitSingle(PIN_VELOCITY);
     adcConfig[FM_INDEX].InitSingle(PIN_FM);
     adcConfig[DRIVE_INDEX].InitSingle(PIN_DRIVE);
     adcConfig[TONE_INDEX].InitSingle(PIN_TONE);
-    hw.adc.Init(adcConfig, 5);
+    hw.adc.Init(adcConfig, 6);
     hw.adc.Start();
 
     // Initialize BassDrum
     drum.Init(
         samplerate,
         PIN_TRIG,
-        PIN_BTN,
+        PIN_BTN1,
         FREQ_INDEX,
         DECAY_INDEX,
+        VELOCITY_INDEX,
         FM_INDEX,
         DRIVE_INDEX,
         TONE_INDEX

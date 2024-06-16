@@ -50,8 +50,6 @@ private:
 
     // Functions
     void m_HandleTrigger() {
-        hw.SetLed(true);
-
         // Read AnalogControl values
         float freqCV = m_freqCtrl.Value();
         float decayCV = m_decayCtrl.Value();
@@ -103,14 +101,14 @@ public:
         m_freqCtrl.Init(hw.adc.GetPtr(freqAdcIndex), samplerate, true);
         m_decayCtrl.Init(hw.adc.GetPtr(decayAdcIndex), samplerate, true);
         m_velocityCtrl.Init(hw.adc.GetPtr(velocityAdcIndex), samplerate, true);
-        m_driveCtrl.Init(hw.adc.GetPtr(driveAdcIndex), samplerate, true);
-        m_fmCtrl.Init(hw.adc.GetPtr(fmAdcIndex), samplerate);
+        m_fmCtrl.Init(hw.adc.GetPtr(fmAdcIndex), samplerate, true);
+        m_driveCtrl.Init(hw.adc.GetPtr(driveAdcIndex), samplerate);
         m_toneCtrl.Init(hw.adc.GetPtr(toneAdcIndex), samplerate);
 
         // Set minimum/maximum control values
         m_FreqMin = 40.f;
         m_FreqMax = 100.f;
-        m_DecayMin = 0.2f;
+        m_DecayMin = 0.25f;
         m_DecayMax = 10.f;
         m_FmMin = 50.f;
         m_FmMax = 250.f;
@@ -173,14 +171,14 @@ public:
         if (m_btn.RisingEdge() || m_trigger.RisingEdge())
         {
             m_HandleTrigger();
-        } else if (m_btn.FallingEdge() || m_trigger.FallingEdge()) {
-            hw.SetLed(false);
         }
     }
 
     float Process() {
         m_osc.SetFreq(m_pitchEnv.Process());
-        m_osc.SetAmp(m_ampEnv.Process());
+        float osc_amp = m_ampEnv.Process();
+        m_osc.SetAmp(osc_amp);
+        led1.Set(osc_amp);
 
         float oscOut = m_osc.Process();
 
@@ -234,7 +232,7 @@ int main(void)
 
     // Initialize indicator Leds
     led1.Init(PIN_LED1, false, samplerate);
-    led1.Set(1.f);
+    led1.Set(0.f);
     led2.Init(PIN_LED2, false, samplerate);
     led2.Set(1.f);
 

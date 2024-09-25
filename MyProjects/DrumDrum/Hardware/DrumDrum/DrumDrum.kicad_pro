@@ -305,6 +305,7 @@
   },
   "schematic": {
     "annotate_start_num": 0,
+    "bom_export_filename": "",
     "bom_fmt_presets": [],
     "bom_fmt_settings": {
       "field_delimiter": ",",
@@ -405,6 +406,18 @@
     [
       "fbe5b851-e39c-456a-a2c9-4b7f6d929ad6",
       "Root"
+    ],
+    [
+      "d4933675-faaa-4d4c-a36c-f66c967b437d",
+      "CV"
+    ],
+    [
+      "8c847545-5e57-4080-8bc0-aaecd4794f4c",
+      "Audio"
+    ],
+    [
+      "6b111be9-d6e2-4dd4-a91a-875debe687eb",
+      "Gates"
     ]
   ],
   "text_variables": {}

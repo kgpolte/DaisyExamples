@@ -1,3 +1,8 @@
+// TO DO
+// Add clock sync
+// Add tap tempo
+// Add split/linked modes for delay time
+
 #include "daisysp.h"
 #include "daisy_seed.h"
 
@@ -5,15 +10,14 @@
 #define LEFT (i)
 #define RIGHT (i + 1)
 
-// Set max delay time to 0.75 of samplerate.
-#define MAX_DELAY static_cast<size_t>(48000 * 0.75f)
+// Set max delay time to 1 second
+#define MAX_DELAY static_cast<size_t>(48000)
 
 using namespace daisysp;
 using namespace daisy;
 
 static DaisySeed hw;
 AnalogControl cv_0, cv_1, cv_2, cv_3;
-float time_factor, fdbk_amount, mix;
 
 // Declare 2 DelayLines of MAX_DELAY number of floats.
 static DelayLine<float, MAX_DELAY> delay_l, delay_r;
@@ -22,15 +26,26 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
                           AudioHandle::InterleavingOutputBuffer out,
                           size_t                                size)
 {
-    float feedback_l, feedback_r, del_out_l, del_out_r, sig_in_l, sig_in_r, sig_out_l, sig_out_r;
+    float   time_factor_l,
+            time_factor_r,
+            fdbk_amount,
+            mix,
+            feedback_l,
+            feedback_r,
+            del_out_l,
+            del_out_r,
+            sig_in_l,
+            sig_in_r,
+            sig_out_l,
+            sig_out_r;
 
-    time_factor = cv_0.Process();
-    fdbk_amount = cv_1.Process();
-    mix = cv_2.Process();
-    cv_3.Process();
+    time_factor_l = cv_0.Process();
+    time_factor_r = cv_1.Process();
+    fdbk_amount = cv_2.Process();
+    mix = cv_3.Process();
 
-    delay_l.SetDelay(MAX_DELAY * time_factor);
-    delay_r.SetDelay(MAX_DELAY * time_factor);
+    delay_l.SetDelay(MAX_DELAY * time_factor_l);
+    delay_r.SetDelay(MAX_DELAY * time_factor_r);
 
     for(size_t i = 0; i < size; i += 2)
     {

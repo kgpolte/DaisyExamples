@@ -2,6 +2,8 @@
 // Add clock sync
 // Add tap tempo
 // Add split/linked modes for delay time
+// Add time range modes (L/M/H)
+// Process the mix control
 
 #include "daisysp.h"
 #include "daisy_seed.h"
@@ -11,17 +13,20 @@
 #define RIGHT (i + 1)
 
 // Set max delay time to 1 second
-#define MAX_DELAY static_cast<size_t>(48000)
+#define MAX_DELAY static_cast<size_t>(48000 * 2.0f)
 
 using namespace daisysp;
 using namespace daisy;
 
 static DaisySeed hw;
-AnalogControl cv_0, cv_1, cv_2, cv_3;
+static AnalogControl cv_0, cv_1, cv_2, cv_3;
+static GateIn clock, hold;
+static Led led_1_b, led_1_r, led_2_b, led_2_r;
+static CrossFade cross_fader;
 
 // Declare 2 DelayLines of MAX_DELAY number of floats.
-static DelayLine<float, MAX_DELAY> delay_l, delay_r;
-
+static DelayLine<float, MAX_DELAY> DSY_SDRAM_BSS delay_l;
+static DelayLine<float, MAX_DELAY> DSY_SDRAM_BSS delay_r;
 static void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
                           AudioHandle::InterleavingOutputBuffer out,
                           size_t                                size)
@@ -43,6 +48,7 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
     time_factor_r = cv_1.Process();
     fdbk_amount = cv_2.Process();
     mix = cv_3.Process();
+    cross_fader.SetPos(mix);
 
     delay_l.SetDelay(MAX_DELAY * time_factor_l);
     delay_r.SetDelay(MAX_DELAY * time_factor_r);
@@ -56,9 +62,9 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
         del_out_r = delay_r.Read();
 
         // Calculate output and feedback
-        sig_out_l  = del_out_l + sig_in_l;
+        sig_out_l  = cross_fader.Process(sig_in_l, del_out_l);
         feedback_l = (del_out_l * fdbk_amount) + sig_in_l;
-        sig_out_r  = del_out_r + sig_in_r;
+        sig_out_r  = cross_fader.Process(sig_in_r, del_out_r);
         feedback_r = (del_out_r * fdbk_amount) + sig_in_r;
 
         // Write to the delay
@@ -73,7 +79,7 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
 
 int main(void)
 {
-    // initialize seed hardware and daisysp modules
+    // initialize the seed hardware
     float sample_rate;
     hw.Configure();
     hw.Init();
@@ -82,9 +88,7 @@ int main(void)
 
 	// initialize the delay lines
     delay_l.Init();
-    delay_l.SetDelay(MAX_DELAY);
     delay_r.Init();
-    delay_r.SetDelay(MAX_DELAY);
 
 	// initialize the ADC
 	const int num_adc_channels = 4;
@@ -102,10 +106,34 @@ int main(void)
     cv_2.Init(hw.adc.GetPtr(2), sample_rate, true, false, 0.01f);
     cv_3.Init(hw.adc.GetPtr(3), sample_rate, true, false, 0.01f);
 
-    // start callback
+    // initialize the gate inputs
+    clock.Init(seed::D26);
+    hold.Init(seed::D27);
+
+    // initialize the LEDs
+    led_1_b.Init(seed::D29, false);
+    led_1_r.Init(seed::D30, false);
+    led_2_b.Init(seed::D8, false);
+    led_2_r.Init(seed::D7, false);
+
+    // initialize the cross_fader (dry/wet control)
+    cross_fader.Init();
+    cross_fader.SetCurve(CROSSFADE_LIN);
+
+    // start the audio callback
     hw.StartAudio(AudioCallback);
 
     while(1) {
-		
+		if (clock.State()) {
+            led_1_b.Set(0.5f);
+            led_1_r.Set(0.5f);
+        } else {
+            led_1_b.Set(0.0f);
+            led_1_r.Set(0.0f);
+        }
+        led_1_b.Update();
+        led_1_r.Update();
+        led_2_b.Update();
+        led_2_r.Update();
 	}
 }

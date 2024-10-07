@@ -12,8 +12,8 @@
 #define LEFT (i)
 #define RIGHT (i + 1)
 
-// Set max delay time to 2 seconds and min delay time to 0.0001 second
-#define MAX_DELAY static_cast<size_t>(96000 * 2.0f)
+// Set max delay time to 2 seconds
+#define MAX_DELAY static_cast<size_t>(96000 * 10.0f)
 #define MIN_DELAY static_cast<size_t>(96000 * 0.0001f)
 
 // namespaces
@@ -28,8 +28,9 @@ static Led led_1_b, led_1_r, led_2_b, led_2_r;
 static CrossFade cross_fader;
 static Switch switch_1, switch_2;
 
-// Global variables
+// mode variables
 bool clock_sync = false;
+int time_range = 0;
 
 // 2 DelayLines of MAX_DELAY number of floats.
 static DelayLine<float, MAX_DELAY> DSY_SDRAM_BSS delay_l;
@@ -108,6 +109,45 @@ static void ProcessSwitches()
             led_1_b.Set(0.0f);
             led_1_r.Set(0.0f);
         }
+    }
+
+    if (switch_2.RisingEdge()) {
+        time_range++;
+        if (time_range >= 4) {
+            time_range = 0;
+        }
+    }
+}
+
+static void SetLeds()
+{
+    if (clock_sync) {
+        if (clock.State()) {
+            led_1_b.Set(1.0f);
+            led_1_r.Set(1.0f);
+        } else {
+            led_1_b.Set(0.4f);
+            led_1_r.Set(0.4f);
+        }
+    }
+
+    switch (time_range) {
+        case 0:
+            led_2_b.Set(0.0f);
+            led_2_r.Set(0.0f);
+            break;
+        case 1:
+            led_2_b.Set(0.5f);
+            led_2_r.Set(0.0f);
+            break;
+        case 2:
+            led_2_b.Set(0.5f);
+            led_2_r.Set(0.5f);
+            break;
+        case 3:
+            led_2_b.Set(0.0f);
+            led_2_r.Set(0.5f);
+            break;
     }
 }
 
@@ -190,17 +230,7 @@ int main(void)
 
     while(1) {
         ProcessSwitches();
-
-        if (clock_sync) {
-            if (clock.State()) {
-                led_1_b.Set(1.0f);
-                led_1_r.Set(1.0f);
-            } else {
-                led_1_b.Set(0.3f);
-                led_1_r.Set(0.3f);
-            }
-        }
-        
+        SetLeds();
         UpdateLeds();
 	}
 }

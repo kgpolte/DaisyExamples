@@ -176,7 +176,7 @@ int main(void)
     hw.Configure();
     hw.Init();
     hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_96KHZ);
-    hw.SetAudioBlockSize(4);
+    hw.SetAudioBlockSize(16);
     sample_rate = hw.AudioSampleRate();
 
     // other initializations

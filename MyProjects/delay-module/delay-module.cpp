@@ -4,37 +4,69 @@
 // Add split/linked modes for delay time
 // Add time range modes (L/M/H)
 // Add a ping-pong mode
+// Make an extended gate input class with edge detection
+// Make a Red/Blue LED class
+// Increase blue LED resistors to 3K3
+
+// --------------------------------------------------------------------
 
 #include "daisysp.h"
 #include "daisy_seed.h"
 
-// Interleaved audio definitions
+// --------------------------------------------------------------------
+
+// interleaved audio definitions
 #define LEFT (i)
 #define RIGHT (i + 1)
 
-// Set max delay time to 2 seconds
+// set the absolute max delay time
 #define MAX_DELAY static_cast<size_t>(96000 * 10.0f)
-#define MIN_DELAY static_cast<size_t>(96000 * 0.0001f)
 
-// namespaces
+// set the min/max delay times for each mode
+#define MIN_DELAY_0 static_cast<size_t>(96000 * 0.0001f)
+#define MAX_DELAY_0 static_cast<size_t>(96000 * 0.1f)
+#define MIN_DELAY_1 static_cast<size_t>(96000 * 0.01f)
+#define MAX_DELAY_1 static_cast<size_t>(96000 * 0.5f)
+#define MIN_DELAY_2 static_cast<size_t>(96000 * 0.1f)
+#define MAX_DELAY_2 static_cast<size_t>(96000 * 2.0f)
+#define MIN_DELAY_3 static_cast<size_t>(96000 * 1.0f)
+#define MAX_DELAY_3 static_cast<size_t>(96000 * 10.0f)
+
+// --------------------------------------------------------------------
+
 using namespace daisysp;
 using namespace daisy;
 
-// Daisy modules
+// --------------------------------------------------------------------
+
+// daisy hardware
 static DaisySeed hw;
+// daisy modules
 static AnalogControl cv_0, cv_1, cv_2, cv_3;
 static GateIn clock, hold;
 static Led led_1_b, led_1_r, led_2_b, led_2_r;
 static CrossFade cross_fader;
 static Switch switch_1, switch_2;
+static DelayLine<float, MAX_DELAY> DSY_SDRAM_BSS delay_l;
+static DelayLine<float, MAX_DELAY> DSY_SDRAM_BSS delay_r;
+
+// --------------------------------------------------------------------
+
+// gate input state tracking for edge detection
+bool clock_state = false;
+bool hold_state = false;
 
 // mode variables
 bool clock_sync = false;
 int time_range = 0;
 
-// 2 DelayLines of MAX_DELAY number of floats.
-static DelayLine<float, MAX_DELAY> DSY_SDRAM_BSS delay_l;
-static DelayLine<float, MAX_DELAY> DSY_SDRAM_BSS delay_r;
+// clock sync variables
+
+// global LED brightness settings
+const float LOW_BRIGHTNESS = 0.4f;
+
+// --------------------------------------------------------------------
+
 
 
 // --------------------------------------------------------------------
@@ -98,39 +130,15 @@ static void InitGpio()
     led_2_r.Init(seed::D7, false);
 }
 
-static void ProcessSwitches()
+static void IncrementTimeRange()
 {
-    switch_1.Debounce();
-    switch_2.Debounce();
-
-    if (switch_1.RisingEdge()) {
-        clock_sync = !clock_sync;
-        if (!clock_sync) {
-            led_1_b.Set(0.0f);
-            led_1_r.Set(0.0f);
-        }
+    // Cycle through the range settings
+    time_range++;
+    if (time_range >= 4) {
+        time_range = 0;
     }
 
-    if (switch_2.RisingEdge()) {
-        time_range++;
-        if (time_range >= 4) {
-            time_range = 0;
-        }
-    }
-}
-
-static void SetLeds()
-{
-    if (clock_sync) {
-        if (clock.State()) {
-            led_1_b.Set(1.0f);
-            led_1_r.Set(1.0f);
-        } else {
-            led_1_b.Set(0.4f);
-            led_1_r.Set(0.4f);
-        }
-    }
-
+    // Update the indicator LED
     switch (time_range) {
         case 0:
             led_2_b.Set(0.0f);
@@ -148,6 +156,69 @@ static void SetLeds()
             led_2_b.Set(0.0f);
             led_2_r.Set(0.5f);
             break;
+    }
+}
+
+static void ToggleClockSync()
+{
+    // toggle clock sync mode
+    clock_sync = !clock_sync;
+
+    // set the led
+    if (clock_sync) {
+        led_1_b.Set(LOW_BRIGHTNESS);
+        led_1_r.Set(LOW_BRIGHTNESS);
+    } else {
+        led_1_b.Set(0.0f);
+        led_1_r.Set(0.0f);
+    }
+}
+
+static void ProcessClockInput()
+{
+    // get the current state of the input
+    bool clock_read = clock.State();
+
+    // check for rising and falling edges
+    if (clock_read && clock_read != clock_state) {
+        // set the led to full
+        led_1_b.Set(1.0f);
+        led_1_r.Set(1.0f);
+
+        // update the stored clock state
+        clock_state = clock_read;
+
+    } else if (!clock_read && clock_read != clock_state) {
+        // set the led to low brightness between pulses
+        led_1_b.Set(LOW_BRIGHTNESS);
+        led_1_r.Set(LOW_BRIGHTNESS);
+
+        // update the stored clock state
+        clock_state = clock_read;
+    }
+}
+
+static void ProcessSwitches()
+{
+    // debounce the switches
+    switch_1.Debounce();
+    switch_2.Debounce();
+
+    // Switch 1
+    if (switch_1.RisingEdge()) {
+        ToggleClockSync();
+    }
+
+    // Switch 2
+    if (switch_2.RisingEdge()) {
+        IncrementTimeRange();
+    }
+}
+
+static void ProcessGateInputs()
+{
+    if (clock_sync) {
+        ProcessClockInput();
     }
 }
 
@@ -230,7 +301,7 @@ int main(void)
 
     while(1) {
         ProcessSwitches();
-        SetLeds();
+        ProcessGateInputs();
         UpdateLeds();
 	}
 }

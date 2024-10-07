@@ -1,9 +1,9 @@
 // TO DO
 // Add clock sync
-// Add tap tempo
+// Add tap tempo and clock divisions/multiplications
 // Add split/linked modes for delay time
 // Add time range modes (L/M/H)
-// Process the mix control
+// Add a ping-pong mode
 
 #include "daisysp.h"
 #include "daisy_seed.h"
@@ -13,7 +13,7 @@
 #define RIGHT (i + 1)
 
 // Set max delay time to 1 second
-#define MAX_DELAY static_cast<size_t>(48000 * 2.0f)
+#define MAX_DELAY static_cast<size_t>(96000 * 2.0f)
 
 using namespace daisysp;
 using namespace daisy;
@@ -23,6 +23,9 @@ static AnalogControl cv_0, cv_1, cv_2, cv_3;
 static GateIn clock, hold;
 static Led led_1_b, led_1_r, led_2_b, led_2_r;
 static CrossFade cross_fader;
+static Switch switch_1, switch_2;
+
+bool clock_sync = false;
 
 // Declare 2 DelayLines of MAX_DELAY number of floats.
 static DelayLine<float, MAX_DELAY> DSY_SDRAM_BSS delay_l;
@@ -83,12 +86,23 @@ int main(void)
     float sample_rate;
     hw.Configure();
     hw.Init();
+    hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_96KHZ);
     hw.SetAudioBlockSize(4);
     sample_rate = hw.AudioSampleRate();
 
 	// initialize the delay lines
     delay_l.Init();
     delay_r.Init();
+
+    // initialize DAC outputs
+	DacHandle::Config dac_cfg;
+	dac_cfg.bitdepth = DacHandle::BitDepth::BITS_12;
+	dac_cfg.buff_state = DacHandle::BufferState::ENABLED;
+	dac_cfg.mode = DacHandle::Mode::POLLING;
+	dac_cfg.chn = DacHandle::Channel::BOTH;
+	hw.dac.Init(dac_cfg);
+	hw.dac.WriteValue(DacHandle::Channel::ONE, 1028); // CV0
+	hw.dac.WriteValue(DacHandle::Channel::TWO, 3084); // CV1
 
 	// initialize the ADC
 	const int num_adc_channels = 4;
@@ -101,14 +115,18 @@ int main(void)
 	hw.adc.Start();
 
 	// initialize the AnalogControls
-	cv_0.Init(hw.adc.GetPtr(0), sample_rate, true, false, 0.01f);
-    cv_1.Init(hw.adc.GetPtr(1), sample_rate, true, false, 0.01f);
-    cv_2.Init(hw.adc.GetPtr(2), sample_rate, true, false, 0.01f);
-    cv_3.Init(hw.adc.GetPtr(3), sample_rate, true, false, 0.01f);
+	cv_0.Init(hw.adc.GetPtr(0), sample_rate, true, false, 0.1f);
+    cv_1.Init(hw.adc.GetPtr(1), sample_rate, true, false, 0.1f);
+    cv_2.Init(hw.adc.GetPtr(2), sample_rate, true, false, 0.1f);
+    cv_3.Init(hw.adc.GetPtr(3), sample_rate, true, false, 0.1f);
 
     // initialize the gate inputs
     clock.Init(seed::D26);
     hold.Init(seed::D27);
+
+    // initialize the push button switches
+    switch_1.Init(seed::D12, 1000.0f);
+    switch_2.Init(seed::D11, 1000.0f);
 
     // initialize the LEDs
     led_1_b.Init(seed::D29, false);
@@ -124,13 +142,29 @@ int main(void)
     hw.StartAudio(AudioCallback);
 
     while(1) {
-		if (clock.State()) {
-            led_1_b.Set(0.5f);
-            led_1_r.Set(0.5f);
-        } else {
-            led_1_b.Set(0.0f);
-            led_1_r.Set(0.0f);
+        switch_1.Debounce();
+        switch_2.Debounce();
+
+        if (switch_1.RisingEdge()) {
+            clock_sync = !clock_sync;
+            if (!clock_sync) {
+                led_1_b.Set(0.0f);
+                led_1_r.Set(0.0f);
+            }
         }
+
+        if (clock_sync) {
+            if (clock.State()) {
+                led_1_b.Set(1.0f);
+                led_1_r.Set(1.0f);
+            } else {
+                led_1_b.Set(0.3f);
+                led_1_r.Set(0.3f);
+            }
+        } else {
+            
+        }
+
         led_1_b.Update();
         led_1_r.Update();
         led_2_b.Update();

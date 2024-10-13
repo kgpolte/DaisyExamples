@@ -1,4 +1,5 @@
 // TO DO
+
 // Add clock sync
 // Add tap tempo and clock divisions/multiplications
 // Add split/linked modes for delay time
@@ -6,12 +7,17 @@
 // Add a ping-pong mode
 // Make an extended gate input class with edge detection
 // Make a Red/Blue LED class
+
 // Increase blue LED resistors to 3K3
+// Separate knobs from time CV inputs
 
 // --------------------------------------------------------------------
 
-#include "daisysp.h"
+#include <stdio.h>
+#include <string.h>
 #include "daisy_seed.h"
+#include "dev/oled_ssd130x.h"
+#include "daisysp.h"
 
 // --------------------------------------------------------------------
 
@@ -37,6 +43,17 @@
 using namespace daisysp;
 using namespace daisy;
 
+/** Typedef the OledDisplay to make syntax cleaner below 
+ *  This is a 4Wire SPI Transport controlling an 128x64 sized SSDD1306
+ * 
+ *  There are several other premade test 
+*/
+using MyOledDisplay = OledDisplay<SSD130x4WireSpi128x64Driver>;
+
+// --------------------------------------------------------------------
+
+
+
 // --------------------------------------------------------------------
 
 // daisy hardware
@@ -49,6 +66,7 @@ static CrossFade cross_fader;
 static Switch switch_1, switch_2;
 static DelayLine<float, MAX_DELAY> DSY_SDRAM_BSS delay_l;
 static DelayLine<float, MAX_DELAY> DSY_SDRAM_BSS delay_r;
+static MyOledDisplay display;
 
 // --------------------------------------------------------------------
 
@@ -67,10 +85,6 @@ const float LOW_BRIGHTNESS = 0.4f;
 
 // --------------------------------------------------------------------
 
-
-
-// --------------------------------------------------------------------
-
 static void InitAnalogControls(float sample_rate)
 {
     // initialize the hardware ADC
@@ -84,10 +98,10 @@ static void InitAnalogControls(float sample_rate)
 	hw.adc.Start();
 
     // initialize the AnalogControl objects
-	cv_0.Init(hw.adc.GetPtr(0), sample_rate, true, false, 0.1f);
-    cv_1.Init(hw.adc.GetPtr(1), sample_rate, true, false, 0.1f);
-    cv_2.Init(hw.adc.GetPtr(2), sample_rate, true, false, 0.1f);
-    cv_3.Init(hw.adc.GetPtr(3), sample_rate, true, false, 0.1f);
+	cv_0.Init(hw.adc.GetPtr(0), sample_rate, true, false, 0.01f);
+    cv_1.Init(hw.adc.GetPtr(1), sample_rate, true, false, 0.01f);
+    cv_2.Init(hw.adc.GetPtr(2), sample_rate, true, false, 0.01f);
+    cv_3.Init(hw.adc.GetPtr(3), sample_rate, true, false, 0.01f);
 }
 
 static void InitDac()
@@ -126,8 +140,8 @@ static void InitGpio()
     // initialize the LEDs
     led_1_b.Init(seed::D29, false);
     led_1_r.Init(seed::D30, false);
-    led_2_b.Init(seed::D8, false);
-    led_2_r.Init(seed::D7, false);
+    led_2_b.Init(seed::D4, false);
+    led_2_r.Init(seed::D3, false);
 }
 
 static void IncrementTimeRange()
@@ -282,13 +296,27 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
 
 int main(void)
 {
-    // initialize the seed hardware
     float sample_rate;
+
+    // initialize the seed hardware
     hw.Configure();
     hw.Init();
     hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_96KHZ);
     hw.SetAudioBlockSize(16);
     sample_rate = hw.AudioSampleRate();
+
+    /** Configure the Display */
+    MyOledDisplay::Config disp_cfg;
+    disp_cfg.driver_config.transport_config.pin_config.dc    = hw.GetPin(9);
+    disp_cfg.driver_config.transport_config.pin_config.reset = hw.GetPin(0);
+    /** And Initialize */
+    display.Init(disp_cfg);
+
+    // Print a test message to the OLED screen
+    display.Fill(true);
+    display.SetCursor(0, 0);
+    display.WriteString("Testing...", Font_11x18, false);
+    display.Update();
 
     // other initializations
     InitAnalogControls(sample_rate);
@@ -298,7 +326,7 @@ int main(void)
 
     // start the audio callback
     hw.StartAudio(AudioCallback);
-
+    
     while(1) {
         ProcessSwitches();
         ProcessGateInputs();

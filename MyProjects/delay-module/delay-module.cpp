@@ -52,13 +52,8 @@ using MyOledDisplay = OledDisplay<SSD130x4WireSpi128x64Driver>;
 
 // --------------------------------------------------------------------
 
-
-
-// --------------------------------------------------------------------
-
-// daisy hardware
-static DaisySeed hw;
 // daisy modules
+static DaisySeed hw;
 static AnalogControl cv_0, cv_1, cv_2, cv_3;
 static GateIn clock, hold;
 static Led led_1_b, led_1_r, led_2_b, led_2_r;
@@ -76,12 +71,16 @@ bool hold_state = false;
 
 // mode variables
 bool clock_sync = false;
+bool channel_link = false;
 int time_range = 0;
 
 // clock sync variables
 
-// global LED brightness settings
+// misc. global settings
 const float LOW_BRIGHTNESS = 0.4f;
+const int long_press_time = 2000;
+int sw1_last_time_held;
+int sw2_last_time_held;
 
 // --------------------------------------------------------------------
 
@@ -144,6 +143,40 @@ static void InitGpio()
     led_2_r.Init(seed::D3, false);
 }
 
+static void UpdateDisplay()
+{
+    // Max 18 characters per line at 7x10 font size
+    // There's probably a better way to increase this
+    // and do wrapping...
+    char str_buffer[18];
+
+    // Clear the display
+    display.Fill(false);
+
+    // Print the first line
+    sprintf(str_buffer, clock_sync ? "Listen: On" : "Listen: Off");
+    display.SetCursor(0, 0);
+    display.WriteString(str_buffer, Font_7x10, true);
+
+    // Print the second line
+    switch (time_range) {
+        case 0: sprintf(str_buffer, "Range: X Fast"); break;
+        case 1: sprintf(str_buffer, "Range: Fast"); break;
+        case 2: sprintf(str_buffer, "Range: Med"); break;
+        case 3: sprintf(str_buffer, "Range: Slow"); break;
+    }
+    display.SetCursor(0, 10);
+    display.WriteString(str_buffer, Font_7x10, true);
+
+    // Print the third line
+    sprintf(str_buffer, channel_link ? "Link: On" : "Link: Off");
+    display.SetCursor(0, 20);
+    display.WriteString(str_buffer, Font_7x10, true);
+
+    // Update the display
+    display.Update();
+}
+
 static void IncrementTimeRange()
 {
     // Cycle through the range settings
@@ -151,41 +184,19 @@ static void IncrementTimeRange()
     if (time_range >= 4) {
         time_range = 0;
     }
-
-    // Update the indicator LED
-    switch (time_range) {
-        case 0:
-            led_2_b.Set(0.0f);
-            led_2_r.Set(0.0f);
-            break;
-        case 1:
-            led_2_b.Set(0.5f);
-            led_2_r.Set(0.0f);
-            break;
-        case 2:
-            led_2_b.Set(0.5f);
-            led_2_r.Set(0.5f);
-            break;
-        case 3:
-            led_2_b.Set(0.0f);
-            led_2_r.Set(0.5f);
-            break;
-    }
 }
 
 static void ToggleClockSync()
 {
     // toggle clock sync mode
     clock_sync = !clock_sync;
+    led_1_b.Set(0.0f);
+    led_1_r.Set(0.0f);
+}
 
-    // set the led
-    if (clock_sync) {
-        led_1_b.Set(LOW_BRIGHTNESS);
-        led_1_r.Set(LOW_BRIGHTNESS);
-    } else {
-        led_1_b.Set(0.0f);
-        led_1_r.Set(0.0f);
-    }
+static void ToggleChannelLink()
+{
+    channel_link = !channel_link;
 }
 
 static void ProcessClockInput()
@@ -204,8 +215,8 @@ static void ProcessClockInput()
 
     } else if (!clock_read && clock_read != clock_state) {
         // set the led to low brightness between pulses
-        led_1_b.Set(LOW_BRIGHTNESS);
-        led_1_r.Set(LOW_BRIGHTNESS);
+        led_1_b.Set(0);
+        led_1_r.Set(0);
 
         // update the stored clock state
         clock_state = clock_read;
@@ -214,18 +225,28 @@ static void ProcessClockInput()
 
 static void ProcessSwitches()
 {
+    bool sw1_released, sw2_released, sw1_long_pressed, sw2_long_pressed;
+
     // debounce the switches
     switch_1.Debounce();
     switch_2.Debounce();
 
-    // Switch 1
-    if (switch_1.RisingEdge()) {
-        ToggleClockSync();
+    // switch 1
+    if (switch_1.Pressed()) sw1_last_time_held = switch_1.TimeHeldMs();
+    sw1_long_pressed = sw1_last_time_held >= long_press_time;
+    sw1_released = switch_1.FallingEdge();
+    if (sw1_released) {
+        sw1_long_pressed ? ToggleChannelLink() : ToggleClockSync();
+        UpdateDisplay();
     }
 
-    // Switch 2
-    if (switch_2.RisingEdge()) {
-        IncrementTimeRange();
+    // switch 2
+    if (switch_2.Pressed()) sw2_last_time_held = switch_2.TimeHeldMs();
+    sw2_long_pressed = sw2_last_time_held >= long_press_time;
+    sw2_released = switch_2.FallingEdge();
+    if (sw2_released) {
+        sw2_long_pressed ? ToggleChannelLink() : IncrementTimeRange();;
+        UpdateDisplay();
     }
 }
 
@@ -262,7 +283,7 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
             sig_out_r;
 
     time_factor_l = cv_0.Process();
-    time_factor_r = cv_1.Process();
+    time_factor_r = channel_link ? time_factor_l : cv_1.Process();
     fdbk_amount = cv_2.Process();
     mix = cv_3.Process();
     cross_fader.SetPos(mix);
@@ -305,18 +326,12 @@ int main(void)
     hw.SetAudioBlockSize(16);
     sample_rate = hw.AudioSampleRate();
 
-    /** Configure the Display */
+    // configure and initialize the display
     MyOledDisplay::Config disp_cfg;
     disp_cfg.driver_config.transport_config.pin_config.dc    = hw.GetPin(9);
     disp_cfg.driver_config.transport_config.pin_config.reset = hw.GetPin(0);
-    /** And Initialize */
     display.Init(disp_cfg);
-
-    // Print a test message to the OLED screen
-    display.Fill(true);
-    display.SetCursor(0, 0);
-    display.WriteString("Testing...", Font_11x18, false);
-    display.Update();
+    UpdateDisplay();
 
     // other initializations
     InitAnalogControls(sample_rate);

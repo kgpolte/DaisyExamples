@@ -2,8 +2,6 @@
 
 // Add clock sync
 // Add tap tempo and clock divisions/multiplications
-// Add split/linked modes for delay time
-// Add time range modes (L/M/H)
 // Add a ping-pong mode
 // Make an extended gate input class with edge detection
 // Make a Red/Blue LED class
@@ -26,7 +24,7 @@
 #define RIGHT (i + 1)
 
 // set the absolute max delay time
-#define MAX_DELAY static_cast<size_t>(96000 * 10.0f)
+#define MAX_DELAY static_cast<size_t>(96000 * 4.0f)
 
 // set the min/max delay times for each mode
 #define MIN_DELAY_0 static_cast<size_t>(96000 * 0.0001f)
@@ -36,7 +34,7 @@
 #define MIN_DELAY_2 static_cast<size_t>(96000 * 0.1f)
 #define MAX_DELAY_2 static_cast<size_t>(96000 * 2.0f)
 #define MIN_DELAY_3 static_cast<size_t>(96000 * 1.0f)
-#define MAX_DELAY_3 static_cast<size_t>(96000 * 10.0f)
+#define MAX_DELAY_3 static_cast<size_t>(96000 * 4.0f)
 
 // --------------------------------------------------------------------
 
@@ -81,6 +79,12 @@ const float LOW_BRIGHTNESS = 0.4f;
 const int long_press_time = 2000;
 int sw1_last_time_held;
 int sw2_last_time_held;
+
+// analog control states
+float   time_factor_l,
+        time_factor_r,
+        fdbk_amount,
+        mix;
 
 // --------------------------------------------------------------------
 
@@ -148,30 +152,31 @@ static void UpdateDisplay()
     // Max 18 characters per line at 7x10 font size
     // There's probably a better way to increase this
     // and do wrapping...
-    char str_buffer[18];
+    char str_buffer[128];
 
     // Clear the display
     display.Fill(false);
 
-    // Print the first line
-    sprintf(str_buffer, clock_sync ? "Listen: On" : "Listen: Off");
+    // Print the first line: external clock listen
+    sprintf(str_buffer, clock_sync ? "Sync: On" : "Sync: Off");
     display.SetCursor(0, 0);
     display.WriteString(str_buffer, Font_7x10, true);
 
-    // Print the second line
+    // Print the second line: time range
     switch (time_range) {
         case 0: sprintf(str_buffer, "Range: X Fast"); break;
         case 1: sprintf(str_buffer, "Range: Fast"); break;
         case 2: sprintf(str_buffer, "Range: Med"); break;
         case 3: sprintf(str_buffer, "Range: Slow"); break;
     }
-    display.SetCursor(0, 10);
+    display.SetCursor(0, 12);
     display.WriteString(str_buffer, Font_7x10, true);
 
-    // Print the third line
+    // Print the third line: channel link
     sprintf(str_buffer, channel_link ? "Link: On" : "Link: Off");
-    display.SetCursor(0, 20);
+    display.SetCursor(0, 24);
     display.WriteString(str_buffer, Font_7x10, true);
+    display.WriteStringAligned("~KG DELAY beta v0.1~", Font_6x8, display.GetBounds(), Alignment::bottomCentered, true);
 
     // Update the display
     display.Update();
@@ -179,7 +184,6 @@ static void UpdateDisplay()
 
 static void IncrementTimeRange()
 {
-    // Cycle through the range settings
     time_range++;
     if (time_range >= 4) {
         time_range = 0;
@@ -188,7 +192,6 @@ static void IncrementTimeRange()
 
 static void ToggleClockSync()
 {
-    // toggle clock sync mode
     clock_sync = !clock_sync;
     led_1_b.Set(0.0f);
     led_1_r.Set(0.0f);
@@ -257,6 +260,39 @@ static void ProcessGateInputs()
     }
 }
 
+static void ProcessAnalogControls()
+{
+    float set_time_l, set_time_r;
+
+    time_factor_l = cv_0.Process();
+    time_factor_r = channel_link ? time_factor_l : cv_1.Process();
+    fdbk_amount = cv_2.Process();
+    mix = cv_3.Process();
+    cross_fader.SetPos(mix);
+
+    switch (time_range) {
+        case 0: 
+            set_time_l = (MAX_DELAY_0 * time_factor_l) + MIN_DELAY_0;
+            set_time_r = (MAX_DELAY_0 * time_factor_r) + MIN_DELAY_0;
+            break;
+        case 1:
+            set_time_l = (MAX_DELAY_1 * time_factor_l) + MIN_DELAY_1;
+            set_time_r = (MAX_DELAY_1 * time_factor_r) + MIN_DELAY_1;
+            break;
+        case 2:
+            set_time_l = (MAX_DELAY_2 * time_factor_l) + MIN_DELAY_2;
+            set_time_r = (MAX_DELAY_2 * time_factor_r) + MIN_DELAY_2;
+            break;
+        case 3:
+            set_time_l = (MAX_DELAY_3 * time_factor_l) + MIN_DELAY_3;
+            set_time_r = (MAX_DELAY_3 * time_factor_r) + MIN_DELAY_3;
+            break;
+    }
+
+    delay_l.SetDelay(set_time_l);
+    delay_r.SetDelay(set_time_r);
+}
+
 static void UpdateLeds()
 {
     led_1_b.Update();
@@ -269,11 +305,7 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
                           AudioHandle::InterleavingOutputBuffer out,
                           size_t                                size)
 {
-    float   time_factor_l,
-            time_factor_r,
-            fdbk_amount,
-            mix,
-            feedback_l,
+    float   feedback_l,
             feedback_r,
             del_out_l,
             del_out_r,
@@ -282,14 +314,7 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
             sig_out_l,
             sig_out_r;
 
-    time_factor_l = cv_0.Process();
-    time_factor_r = channel_link ? time_factor_l : cv_1.Process();
-    fdbk_amount = cv_2.Process();
-    mix = cv_3.Process();
-    cross_fader.SetPos(mix);
-
-    delay_l.SetDelay(MAX_DELAY * time_factor_l);
-    delay_r.SetDelay(MAX_DELAY * time_factor_r);
+    ProcessAnalogControls();
 
     for(size_t i = 0; i < size; i += 2)
     {

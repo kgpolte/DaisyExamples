@@ -24,7 +24,7 @@ int main(void)
     /** Configure the Display */
     MyOledDisplay::Config disp_cfg;
     disp_cfg.driver_config.transport_config.pin_config.dc    = hw.GetPin(9);
-    disp_cfg.driver_config.transport_config.pin_config.reset = hw.GetPin(30);
+    disp_cfg.driver_config.transport_config.pin_config.reset = hw.GetPin(0);
     /** And Initialize */
     display.Init(disp_cfg);
 

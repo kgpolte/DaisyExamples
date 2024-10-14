@@ -24,7 +24,7 @@
 #define RIGHT (i + 1)
 
 // set the absolute max delay time
-#define MAX_DELAY static_cast<size_t>(96000 * 4.0f)
+#define MAX_DELAY static_cast<size_t>(96000 * 10.0f)
 
 // set the min/max delay times for each mode
 #define MIN_DELAY_0 static_cast<size_t>(96000 * 0.0001f)
@@ -43,8 +43,6 @@ using namespace daisy;
 
 /** Typedef the OledDisplay to make syntax cleaner below 
  *  This is a 4Wire SPI Transport controlling an 128x64 sized SSDD1306
- * 
- *  There are several other premade test 
 */
 using MyOledDisplay = OledDisplay<SSD130x4WireSpi128x64Driver>;
 
@@ -324,13 +322,13 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
         del_out_l = delay_l.Read();
         del_out_r = delay_r.Read();
 
-        // Calculate output and feedback
+        // Calculate outputs and feedback
         sig_out_l  = cross_fader.Process(sig_in_l, del_out_l);
         feedback_l = (del_out_l * fdbk_amount) + sig_in_l;
         sig_out_r  = cross_fader.Process(sig_in_r, del_out_r);
         feedback_r = (del_out_r * fdbk_amount) + sig_in_r;
 
-        // Write to the delay
+        // Write to the delay lines
         delay_l.Write(feedback_l);
         delay_r.Write(feedback_r);
 

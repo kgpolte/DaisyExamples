@@ -52,12 +52,12 @@ using MyOledDisplay = OledDisplay<SSD130x4WireSpi128x64Driver>;
 static DaisySeed hw;
 static AnalogControl cv_0, cv_1, cv_2, cv_3;
 static GateIn clock, hold;
-static Led led_1_b, led_1_r, led_2_b, led_2_r;
+static Led led_1_b, led_1_r;
 static CrossFade cross_fader;
-static Switch switch_1, switch_2;
 static DelayLine<float, MAX_DELAY> DSY_SDRAM_BSS delay_l;
 static DelayLine<float, MAX_DELAY> DSY_SDRAM_BSS delay_r;
 static MyOledDisplay display;
+static Encoder enc;
 
 // --------------------------------------------------------------------
 
@@ -66,6 +66,8 @@ bool clock_state = false;
 bool hold_state = false;
 
 // mode variables
+int menu_index = 0;
+bool screen_fill = false;
 bool clock_sync = false;
 bool channel_link = false;
 int time_range = 0;
@@ -134,15 +136,9 @@ static void InitGpio()
     clock.Init(seed::D26);
     hold.Init(seed::D27);
 
-    // initialize the push button switches
-    switch_1.Init(seed::D12, 1000.0f);
-    switch_2.Init(seed::D11, 1000.0f);
-
     // initialize the LEDs
-    led_1_b.Init(seed::D29, false);
-    led_1_r.Init(seed::D30, false);
-    led_2_b.Init(seed::D4, false);
-    led_2_r.Init(seed::D3, false);
+    led_1_b.Init(seed::D4, false);
+    led_1_r.Init(seed::D3, false);
 }
 
 static void UpdateDisplay()
@@ -224,38 +220,16 @@ static void ProcessClockInput()
     }
 }
 
-static void ProcessSwitches()
-{
-    bool sw1_released, sw2_released, sw1_long_pressed, sw2_long_pressed;
-
-    // debounce the switches
-    switch_1.Debounce();
-    switch_2.Debounce();
-
-    // switch 1
-    if (switch_1.Pressed()) sw1_last_time_held = switch_1.TimeHeldMs();
-    sw1_long_pressed = sw1_last_time_held >= long_press_time;
-    sw1_released = switch_1.FallingEdge();
-    if (sw1_released) {
-        sw1_long_pressed ? ToggleChannelLink() : ToggleClockSync();
-        UpdateDisplay();
-    }
-
-    // switch 2
-    if (switch_2.Pressed()) sw2_last_time_held = switch_2.TimeHeldMs();
-    sw2_long_pressed = sw2_last_time_held >= long_press_time;
-    sw2_released = switch_2.FallingEdge();
-    if (sw2_released) {
-        sw2_long_pressed ? ToggleChannelLink() : IncrementTimeRange();;
-        UpdateDisplay();
-    }
-}
-
 static void ProcessGateInputs()
 {
     if (clock_sync) {
         ProcessClockInput();
     }
+}
+
+static void ProcessEncoder()
+{
+    enc.Debounce();
 }
 
 static void ProcessAnalogControls()
@@ -295,8 +269,6 @@ static void UpdateLeds()
 {
     led_1_b.Update();
     led_1_r.Update();
-    led_2_b.Update();
-    led_2_r.Update();
 }
 
 static void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
@@ -356,6 +328,9 @@ int main(void)
     display.Init(disp_cfg);
     UpdateDisplay();
 
+    // initialize the encoder
+    enc.Init(seed::D11, seed::D12, seed::D30);
+
     // other initializations
     InitAnalogControls(sample_rate);
     InitDac();
@@ -366,7 +341,7 @@ int main(void)
     hw.StartAudio(AudioCallback);
     
     while(1) {
-        ProcessSwitches();
+        ProcessEncoder();
         ProcessGateInputs();
         UpdateLeds();
 	}

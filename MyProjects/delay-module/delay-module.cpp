@@ -181,6 +181,15 @@ static void UpdateDisplay()
     display.Update();
 }
 
+static void InitOled()
+{
+    MyOledDisplay::Config disp_cfg;
+    disp_cfg.driver_config.transport_config.pin_config.dc    = hw.GetPin(9);
+    disp_cfg.driver_config.transport_config.pin_config.reset = hw.GetPin(0);
+    display.Init(disp_cfg);
+    UpdateDisplay();
+}
+
 static void IncrementTimeRange()
 {
     time_range++;
@@ -232,30 +241,39 @@ static void ProcessGateInputs()
     }
 }
 
+static void MenuMove(int increment)
+{
+    menu_index += increment;
+    if (menu_index < 0) {
+        menu_index = 2;
+    } else if (menu_index > 2) {
+        menu_index = 0;
+    }
+
+    UpdateDisplay();
+}
+
+static void MenuClick()
+{
+    switch (menu_index) {
+        case 0: ToggleClockSync(); break;
+        case 1: IncrementTimeRange(); break;
+        case 2: ToggleChannelLink(); break;
+    }
+
+    UpdateDisplay();
+}
+
 static void ProcessEncoder()
 {
     enc.Debounce();
-
-    // check for encoder turn
     int increment = enc.Increment();
     if (increment != 0) {
-        menu_index += increment;
-        if (menu_index < 0) {
-            menu_index = 2;
-        } else if (menu_index > 2) {
-            menu_index = 0;
-        }
-        UpdateDisplay();
+        MenuMove(increment);
     }
 
-    // check for encoder click
     if (enc.RisingEdge()) {
-        switch (menu_index) {
-            case 0: ToggleClockSync(); break;
-            case 1: IncrementTimeRange(); break;
-            case 2: ToggleChannelLink(); break;
-        }
-        UpdateDisplay();
+        MenuClick();
     }
 }
 
@@ -349,13 +367,6 @@ int main(void)
     hw.SetAudioBlockSize(16);
     sample_rate = hw.AudioSampleRate();
 
-    // configure and initialize the display
-    MyOledDisplay::Config disp_cfg;
-    disp_cfg.driver_config.transport_config.pin_config.dc    = hw.GetPin(9);
-    disp_cfg.driver_config.transport_config.pin_config.reset = hw.GetPin(0);
-    display.Init(disp_cfg);
-    UpdateDisplay();
-
     // initialize the encoder
     enc.Init(seed::D11, seed::D12, seed::D30);
 
@@ -364,6 +375,7 @@ int main(void)
     InitDac();
     InitGpio();
     InitDspModules();
+    InitOled();
 
     // start the audio callback
     hw.StartAudio(AudioCallback);

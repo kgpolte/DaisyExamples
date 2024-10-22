@@ -151,9 +151,15 @@ static void UpdateDisplay()
     // Clear the display
     display.Fill(false);
 
+    // draw a menu item indicator
+    int pip_x, pip_y;
+    pip_x = 6;
+    pip_y = (menu_index * 12) + 3;
+    display.DrawCircle(pip_x, pip_y, 2, true);
+
     // Print the first line: external clock listen
     sprintf(str_buffer, clock_sync ? "Sync: On" : "Sync: Off");
-    display.SetCursor(0, 0);
+    display.SetCursor(12, 0);
     display.WriteString(str_buffer, Font_7x10, true);
 
     // Print the second line: time range
@@ -163,14 +169,13 @@ static void UpdateDisplay()
         case 2: sprintf(str_buffer, "Range: Med"); break;
         case 3: sprintf(str_buffer, "Range: Slow"); break;
     }
-    display.SetCursor(0, 12);
+    display.SetCursor(12, 12);
     display.WriteString(str_buffer, Font_7x10, true);
 
     // Print the third line: channel link
     sprintf(str_buffer, channel_link ? "Link: On" : "Link: Off");
-    display.SetCursor(0, 24);
+    display.SetCursor(12, 24);
     display.WriteString(str_buffer, Font_7x10, true);
-    display.WriteStringAligned("~KG DELAY beta v0.1~", Font_6x8, display.GetBounds(), Alignment::bottomCentered, true);
 
     // Update the display
     display.Update();
@@ -230,11 +235,34 @@ static void ProcessGateInputs()
 static void ProcessEncoder()
 {
     enc.Debounce();
+
+    // check for encoder turn
+    int increment = enc.Increment();
+    if (increment != 0) {
+        menu_index += increment;
+        if (menu_index < 0) {
+            menu_index = 2;
+        } else if (menu_index > 2) {
+            menu_index = 0;
+        }
+        UpdateDisplay();
+    }
+
+    // check for encoder click
+    if (enc.RisingEdge()) {
+        switch (menu_index) {
+            case 0: ToggleClockSync(); break;
+            case 1: IncrementTimeRange(); break;
+            case 2: ToggleChannelLink(); break;
+        }
+        UpdateDisplay();
+    }
 }
 
 static void ProcessAnalogControls()
 {
-    float set_time_l, set_time_r;
+    float set_time_l = 0;
+    float set_time_r = 0;
 
     time_factor_l = cv_0.Process();
     time_factor_r = channel_link ? time_factor_l : cv_1.Process();
